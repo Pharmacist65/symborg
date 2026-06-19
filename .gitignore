@@ -18,6 +18,8 @@ dist/
 build/
 .next/
 coverage/
+__pycache__/
+*.pyc
 
 # Local environment
 .env

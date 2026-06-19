@@ -1,93 +1,85 @@
 # Contextual Whisper Demo
 
-This prototype will be the first working proof of concept for SYMBORG.
+This is the first working prototype seed for SYMBORG.
 
-## Objective
+## Goal
 
-Given a short live or recorded conversation transcript, the system should produce three ranked cognitive packets:
+Take a short conversation transcript and return three ranked cognitive packets:
 
-1. A concise fact or framing cue
-2. A useful question or conversational move
-3. A deeper optional context cue
+1. An anchor cue
+2. A question cue
+3. A counterpoint cue
 
-The system should also provide confidence and choose silence when the context is too sensitive, too uncertain, or not useful.
+The first version is intentionally heuristic and can run without an LLM. It proves the packet format and product behavior before adding streaming ASR, retrieval, or model-based rewriting.
 
-## Prototype Scope
+## Run
 
-Input:
-
-- Transcript text
-- Optional user notes
-- Optional source snippets
-- Manual mode setting
-
-Output:
-
-- Three micro-cues
-- Packet type
-- Confidence
-- Source note
-- Silence recommendation when appropriate
-
-## Example API Shape
-
-```json
-{
-  "context": "A group is discussing Great Expectations and shame.",
-  "mode": "conversation",
-  "user_goal": "Participate naturally without pretending expertise.",
-  "source_snippets": [
-    "Pip's aspiration is linked to social shame and self-reinvention."
-  ]
-}
+```bash
+PYTHONPATH=src python -m symborg.heuristic_engine examples/great_expectations_context.txt
 ```
 
-Expected output:
+## Example Input
 
-```json
-{
-  "packets": [
-    {
-      "type": "framing_cue",
-      "text": "Pip links class desire with shame and self-reinvention.",
-      "confidence": 0.82
-    },
-    {
-      "type": "question_cue",
-      "text": "Ask whether ambition is really escape from self-disgust.",
-      "confidence": 0.76
-    },
-    {
-      "type": "depth_cue",
-      "text": "Miss Havisham can be read as frozen trauma.",
-      "confidence": 0.68
-    }
-  ],
-  "should_speak": true,
-  "reason": "The cues are short, context-relevant, and non-sensitive."
-}
+```text
+A: I think Great Expectations is less about class mobility and more about shame.
+B: Interesting. What do you think?
 ```
 
-## Evaluation
+## Example Output
+
+```json
+[
+  {
+    "packet_type": "anchor",
+    "cue": "Pip's class desire is tied to shame, guilt, and self-escape.",
+    "confidence": 0.86,
+    "topic": "Great Expectations",
+    "delivery": "screen",
+    "interruption_risk": "low"
+  },
+  {
+    "packet_type": "question",
+    "cue": "Ask whether Pip wants Estella, or the class world she represents.",
+    "confidence": 0.82,
+    "topic": "Great Expectations",
+    "delivery": "screen",
+    "interruption_risk": "low"
+  },
+  {
+    "packet_type": "counterpoint",
+    "cue": "Maybe class and shame are not separate; class pressure produces the shame.",
+    "confidence": 0.8,
+    "topic": "Great Expectations",
+    "delivery": "screen",
+    "interruption_risk": "low"
+  }
+]
+```
+
+## What It Demonstrates
+
+- context extraction
+- packet generation
+- ranking
+- latency-friendly output
+- no claim of thought decoding
+
+## Evaluation Targets
 
 Measure:
 
-- Time to output
-- Cue length
-- Usefulness
-- Factuality
-- Interruption cost
-- User agency
-- Whether silence would have been better
+- cue latency
+- cue length
+- usefulness
+- factuality
+- interruption cost
+- user agency
+- whether silence would have been better
 
-## Next Build Step
+## Next Steps
 
-Build a minimal web demo with:
-
-- Transcript input panel
-- Optional source snippets
-- Packet output cards
-- Confidence display
-- Silence toggle
-- Haptic control simulation
-
+1. Replace heuristic detection with streaming ASR + entity extraction.
+2. Add local vector retrieval.
+3. Add optional local LLM packet rewriting.
+4. Add user feedback: accept / reject / deepen / silence.
+5. Add assistive mode candidate selection.

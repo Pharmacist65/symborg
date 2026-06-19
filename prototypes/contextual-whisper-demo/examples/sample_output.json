@@ -1,0 +1,44 @@
+[
+  {
+    "packet_type": "anchor",
+    "cue": "Pip's class desire is tied to shame, guilt, and self-escape.",
+    "confidence": 0.86,
+    "topic": "Great Expectations",
+    "depth": 1,
+    "delivery": "screen",
+    "interruption_risk": "low",
+    "supporting_context": [
+      "Pip",
+      "shame",
+      "class desire",
+      "guilt"
+    ]
+  },
+  {
+    "packet_type": "question",
+    "cue": "Ask whether Pip wants Estella, or the class world she represents.",
+    "confidence": 0.82,
+    "topic": "Great Expectations",
+    "depth": 1,
+    "delivery": "screen",
+    "interruption_risk": "low",
+    "supporting_context": [
+      "Estella",
+      "class",
+      "desire"
+    ]
+  },
+  {
+    "packet_type": "counterpoint",
+    "cue": "Maybe class and shame are not separate; class pressure produces the shame.",
+    "confidence": 0.8,
+    "topic": "Great Expectations",
+    "depth": 1,
+    "delivery": "screen",
+    "interruption_risk": "low",
+    "supporting_context": [
+      "class anxiety",
+      "shame"
+    ]
+  }
+]

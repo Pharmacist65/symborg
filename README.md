@@ -4,17 +4,17 @@
 
 **A symbiotic cognitive front-end layer for human-AI interaction.**
 
-SYMBORG is a product and research concept for a non-invasive cognitive interface that detects real-world context, retrieves relevant knowledge, compresses it into brief cognitive packets, and returns it to the user through subtle sensory channels such as audio, AR, and haptics.
+SYMBORG is a product and research concept for a non-invasive cognitive interface that detects real-world context, retrieves relevant knowledge, compresses it into brief cognitive packets, and returns those packets to the user through subtle sensory channels such as audio, AR, haptics, or assistive communication outputs.
 
-The project does not propose uploading knowledge into the brain. It asks a narrower and more practical question:
+The project does **not** propose uploading knowledge into the brain. It asks a narrower and more practical question:
 
 > If AI can retrieve more information than a person can hold in attention, what is the right interface for returning that information to human consciousness without disrupting agency, attention, or social presence?
 
-## Positioning
+## Core Positioning
 
-Brain-computer interfaces focus on decoding neural intent and enabling control. Large language models focus on retrieval, reasoning, and generation. SYMBORG explores the missing layer between those domains: a cognitive front-end that makes returned information usable by a human mind in real time.
+Brain-computer interfaces focus on decoding neural intent and enabling control. Large language models focus on retrieval, reasoning, and generation. SYMBORG explores the missing layer between those domains: a **cognitive front-end** that makes returned information usable by a human mind in real time.
 
-**Short version:** Neural interfaces can decode intent. SYMBORG explores how intent, context, and retrieved knowledge can be shaped back into meaningful human communication.
+**Short version:** neural interfaces can decode intent; SYMBORG explores how intent, context, and retrieved knowledge can be shaped back into meaningful human communication.
 
 ## What This Repository Contains
 
@@ -22,7 +22,10 @@ Brain-computer interfaces focus on decoding neural intent and enabling control. 
 - A system architecture for the SYMBORG interaction loop
 - A product roadmap from wearable AI to BCI-compatible assistive communication
 - Ethical design principles for attention, agency, and mental privacy
+- A cognitive thought model and intervention map
+- A signal ladder that separates realistic v0 inputs from future BCI-compatible work
 - Demo scenarios for portfolio and prototype development
+- A minimal heuristic contextual whisper prototype
 - A launch kit for LinkedIn and X
 - Visual assets for a professional case study, deck, or landing page
 
@@ -33,7 +36,7 @@ The future problem is not only storing knowledge or decoding the brain. It is ro
 SYMBORG treats intelligence augmentation as an interface design problem:
 
 ```text
-Environment and conversation
+Environment, conversation, user state
         |
         v
 Context Engine
@@ -45,14 +48,47 @@ Retrieval Engine + Local Memory Vault
 Cognitive Packet Engine
         |
         v
-Confidence and Ethics Filter
+Confidence, Safety, and Ethics Filter
         |
         v
 Audio, AR, haptic, or assistive communication output
         |
         v
-Human attention and communication
+Human attention, thought, and communication
 ```
+
+## Brain Thought Model
+
+SYMBORG uses a practical working model of thought formation. It is not a claim that the brain literally works like software; it is an interface abstraction.
+
+```text
+Trigger -> salience -> association -> competition -> conscious access -> expression -> feedback
+```
+
+SYMBORG does not try to replace this loop. It enters around narrow support points:
+
+- **Before the thought fully forms:** by reading conversation context.
+- **During associative retrieval:** by retrieving relevant knowledge faster than manual search.
+- **At the attention gate:** by compressing information into small cues that fit working memory.
+- **At verbal preparation:** by suggesting possible questions, anchors, counterpoints, or sentence candidates.
+
+See [docs/brain-thought-model.md](docs/brain-thought-model.md) and [docs/where-symborg-intervenes.md](docs/where-symborg-intervenes.md).
+
+## Signal Ladder
+
+The project separates five kinds of signal. This prevents overclaiming and keeps the first prototype realistic.
+
+```text
+L0 - Environmental signal: conversation, audio, screen context, calendar, notes.
+L1 - Behavioral signal: pauses, speech rhythm, gaze, head movement, ring gestures.
+L2 - Physiological signal: heart rate, breathing, eye movement, muscle tension.
+L3 - Non-invasive neural signal: EEG, fNIRS, P300, SSVEP, motor imagery research.
+L4 - Invasive BCI signal: medical/regulatory context and future assistive workflows.
+```
+
+SYMBORG v0 should optimize **L0 + L1** first. Later versions may explore L2/L3 for load awareness. L4 belongs to future-compatible assistive communication research, not an early consumer claim.
+
+See [docs/signal-strategy.md](docs/signal-strategy.md).
 
 ## Key Concept: Cognitive Packet Engine
 
@@ -73,21 +109,37 @@ SYMBORG output:
 "Pip: shame, class desire, guilt. Ask whether ambition is really self-escape."
 ```
 
+A packet is not an article. It is a thought seed.
+
+```json
+{
+  "type": "question",
+  "cue": "Ask whether Pip wants Estella, or the class world she represents.",
+  "depth": 1,
+  "confidence": 0.82,
+  "delivery": "audio_whisper",
+  "interrupt_risk": "low"
+}
+```
+
 ## MVP Direction
 
 The first version should not be an implant.
 
 The practical prototype path is:
 
-1. Live conversation transcription
+1. Live or recorded conversation transcription
 2. Context and entity detection
 3. Local notes and source retrieval
 4. Micro-cue generation
 5. Confidence scoring
 6. Audio or screen-based delivery
 7. Haptic control for silence, depth, and source checks
+8. Logging for cue quality, latency, and interruption cost
 
-See [docs/product-roadmap.md](docs/product-roadmap.md) and [prototypes/contextual-whisper-demo](prototypes/contextual-whisper-demo).
+The next milestone is a working **Contextual Whisper** prototype that takes live or recorded conversation text and returns three ranked micro-cues.
+
+See [docs/mvp-v0-contextual-whisper.md](docs/mvp-v0-contextual-whisper.md), [docs/product-roadmap.md](docs/product-roadmap.md), and [prototypes/contextual-whisper-demo](prototypes/contextual-whisper-demo).
 
 ## Assistive Communication Focus
 
@@ -96,6 +148,8 @@ The strongest serious demo is not a social "make me smarter" assistant. It is an
 In that scenario, a person who can only provide a small number of signals could use SYMBORG to select from context-aware sentence candidates. The value proposition is dignity, autonomy, and communication efficiency.
 
 This project is not a medical device and makes no therapeutic claims.
+
+See [docs/assistive-communication-mode.md](docs/assistive-communication-mode.md).
 
 ## Visual System
 
@@ -111,7 +165,13 @@ More visuals are in [assets/visuals](assets/visuals).
 docs/
   one-page-brief.md
   whitepaper.md
+  brain-thought-model.md
+  where-symborg-intervenes.md
+  signal-strategy.md
   architecture.md
+  mvp-v0-contextual-whisper.md
+  assistive-communication-mode.md
+  research-roadmap.md
   ethics.md
   product-roadmap.md
   demo-scenarios.md
@@ -123,6 +183,12 @@ assets/
 
 prototypes/
   contextual-whisper-demo/
+    README.md
+    pyproject.toml
+    src/symborg/
+      packet.py
+      heuristic_engine.py
+    examples/
 
 references/
   sources.md
