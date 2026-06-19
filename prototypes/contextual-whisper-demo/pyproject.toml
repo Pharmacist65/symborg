@@ -1,8 +1,12 @@
 [project]
 name = "symborg-contextual-whisper-demo"
-version = "0.0.1"
-description = "A minimal heuristic prototype for SYMBORG cognitive packets."
+version = "0.0.2"
+description = "A minimal heuristic prototype for SYMBORG cognitive packets and evaluation."
 requires-python = ">=3.10"
+
+[project.scripts]
+symborg-whisper = "symborg.heuristic_engine:main"
+symborg-evaluate = "symborg.evaluate:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

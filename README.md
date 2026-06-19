@@ -122,6 +122,35 @@ A packet is not an article. It is a thought seed.
 }
 ```
 
+## Evaluation Layer
+
+SYMBORG should not only generate cues; it should measure whether a cue is worth interrupting a human mind.
+
+The prototype now treats every cognitive packet as a scored object with measurable properties:
+
+```text
+brevity + actionability + confidence + low interruption risk + low cognitive load
+```
+
+This allows the project to test questions such as:
+
+- Is the cue short enough to fit working memory?
+- Does it suggest a usable thought move rather than dumping facts?
+- Should the system speak now, wait, or stay silent?
+- Did the packet preserve user agency?
+- Was the assistive candidate useful for a low-bandwidth user?
+
+See [docs/cognitive-packet-engine-spec.md](docs/cognitive-packet-engine-spec.md), [docs/evaluation-protocol.md](docs/evaluation-protocol.md), and [docs/latency-and-interruption-model.md](docs/latency-and-interruption-model.md).
+
+Prototype commands:
+
+```bash
+cd prototypes/contextual-whisper-demo
+PYTHONPATH=src python -m symborg.heuristic_engine examples/dickens_context.txt --pause-ms 900 --delivery audio_whisper
+PYTHONPATH=src python -m symborg.evaluate evaluation/fixtures.jsonl
+PYTHONPATH=src python -m unittest discover tests
+```
+
 ## MVP Direction
 
 The first version should not be an implant.
@@ -168,6 +197,9 @@ docs/
   brain-thought-model.md
   where-symborg-intervenes.md
   signal-strategy.md
+  cognitive-packet-engine-spec.md
+  evaluation-protocol.md
+  latency-and-interruption-model.md
   architecture.md
   mvp-v0-contextual-whisper.md
   assistive-communication-mode.md

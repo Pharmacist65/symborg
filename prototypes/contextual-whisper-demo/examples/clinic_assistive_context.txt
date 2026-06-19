@@ -1,0 +1,3 @@
+Doctor: Can you tell us where the pain is and whether it is worse at night?
+Patient input channel: limited selection only.
+Nurse: Do you want help changing position?
