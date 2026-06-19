@@ -1,0 +1,24 @@
+# Local notes and draft exports
+*.docx
+*.pdf
+*.pages
+*.key
+*.pptx
+SYMBORG_visuals/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build and package outputs
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
+# Local environment
+.env
+.env.*
