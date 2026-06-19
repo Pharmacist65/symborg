@@ -36,7 +36,7 @@ This is not a medical device claim, and it is not affiliated with any BCI compan
 
 I would value critique from people working in HCI, wearable AI, neurotechnology ethics, assistive communication, accessibility, or brain-computer interfaces.
 
-Repository: [GitHub link]
+Repository: https://github.com/Pharmacist65/symborg
 ```
 
 ## LinkedIn Post: Shorter Version
@@ -52,7 +52,7 @@ If AI can retrieve more information than we can hold in attention, how should th
 
 I am looking for serious critique from people in HCI, wearable AI, assistive communication, BCI, accessibility, and neurotechnology ethics.
 
-Repository: [GitHub link]
+Repository: https://github.com/Pharmacist65/symborg
 ```
 
 ## X Thread
@@ -107,7 +107,7 @@ Just a focused question about the missing interface layer between AI retrieval a
 
 7/ I would value critique from people working on HCI, wearable AI, assistive communication, accessibility, BCI, or neurotechnology ethics.
 
-Repo: [GitHub link]
+Repo: https://github.com/Pharmacist65/symborg
 ```
 
 ## X Single Post
@@ -119,7 +119,7 @@ The question:
 
 If AI can retrieve more than we can hold in attention, how should information return to the person without overload or loss of agency?
 
-Repo: [GitHub link]
+Repo: https://github.com/Pharmacist65/symborg
 ```
 
 ## Visual Posting Order
@@ -147,4 +147,3 @@ Repo: [GitHub link]
 - "Assistive communication use case"
 - "Agency-preserving cognitive cues"
 - "Looking for critique from builders and researchers"
-
