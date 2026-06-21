@@ -1,5 +1,13 @@
 # Demo Scenarios
 
+These scenarios now map to the working local demo in [prototypes/symborg-live-demo](../prototypes/symborg-live-demo). Use them as recording material, evaluation prompts, and portfolio examples.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 prototypes/symborg-live-demo/server.py
+```
+
+Open `http://127.0.0.1:8765`.
+
 ## Demo 1: Contextual Whisper
 
 ### Goal
@@ -78,6 +86,8 @@ Cue 3: Good interfaces should reduce load, not add more things to track.
 
 Demonstrate a more serious use case for constrained input.
 
+This is the priority demo for serious reviewers because it shows agency-preserving output rather than a generic productivity assistant.
+
 ### Scenario
 
 A user can make one selection signal. A doctor asks:
@@ -123,4 +133,3 @@ No cue. Optional haptic state only.
 ### Why It Works
 
 SYMBORG should not optimize for constant intervention. It should optimize for human agency.
-

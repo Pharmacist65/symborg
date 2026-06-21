@@ -25,6 +25,7 @@ Brain-computer interfaces focus on decoding neural intent and enabling control. 
 - A cognitive thought model and intervention map
 - A signal ladder that separates realistic v0 inputs from future BCI-compatible work
 - Demo scenarios for portfolio and prototype development
+- A portfolio case study and demo recording plan
 - A minimal heuristic contextual whisper prototype
 - A feedback and device output layer with modality routing
 - An integrated browser demo connecting packet generation, quality gating, and routing
@@ -211,6 +212,15 @@ Then open `http://127.0.0.1:8765`.
 
 See [prototypes/symborg-live-demo](prototypes/symborg-live-demo).
 
+## Portfolio and Launch Materials
+
+For a reviewer or social launch, start with:
+
+- [Portfolio case study](docs/portfolio-case-study.md)
+- [Demo recording plan](docs/demo-recording-plan.md)
+- [Social launch kit](docs/social-launch-kit.md)
+- [Visual prompts](assets/visuals/prompts.md)
+
 ## MVP Direction
 
 The first version should not be an implant.
@@ -274,6 +284,8 @@ docs/
   ethics.md
   product-roadmap.md
   demo-scenarios.md
+  portfolio-case-study.md
+  demo-recording-plan.md
   collaboration-strategy.md
   social-launch-kit.md
 
