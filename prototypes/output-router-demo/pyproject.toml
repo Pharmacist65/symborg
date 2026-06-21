@@ -1,0 +1,5 @@
+[project]
+name = "symborg-output-router-demo"
+version = "0.1.0"
+description = "A tiny output modality router for SYMBORG cognitive packets"
+requires-python = ">=3.10"

@@ -1,0 +1,29 @@
+[
+  {
+    "packet_type": "question",
+    "cue": "Ask if Pip wants Estella or the class world she represents.",
+    "confidence": 0.84,
+    "topic": "Great Expectations",
+    "expected_use": "ask",
+    "cognitive_load": 2,
+    "interruption_risk": "low"
+  },
+  {
+    "packet_type": "warning",
+    "cue": "Low confidence. Phrase as possibility.",
+    "confidence": 0.62,
+    "topic": "Factual claim",
+    "expected_use": "warn",
+    "cognitive_load": 1,
+    "interruption_risk": "low"
+  },
+  {
+    "packet_type": "assistive_candidate",
+    "cue": "I need help changing my position.",
+    "confidence": 0.91,
+    "topic": "clinical assistance",
+    "expected_use": "select_sentence",
+    "cognitive_load": 1,
+    "interruption_risk": "low"
+  }
+]

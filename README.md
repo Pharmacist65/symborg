@@ -26,6 +26,7 @@ Brain-computer interfaces focus on decoding neural intent and enabling control. 
 - A signal ladder that separates realistic v0 inputs from future BCI-compatible work
 - Demo scenarios for portfolio and prototype development
 - A minimal heuristic contextual whisper prototype
+- A feedback and device output layer with modality routing
 - A launch kit for LinkedIn and X
 - Visual assets for a professional case study, deck, or landing page
 
@@ -151,6 +152,46 @@ PYTHONPATH=src python -m symborg.evaluate evaluation/fixtures.jsonl
 PYTHONPATH=src python -m unittest discover tests
 ```
 
+## Feedback and Device Layer
+
+SYMBORG should be treated as a family of output interfaces, not a single device. After the Cognitive Packet Engine creates a thought seed, an Output Policy Engine decides whether the cue should be returned, and a Modality Router decides how it should be returned: audio whisper, AR card, haptic cue, screen card, assistive sentence candidate, or future neural-write research output.
+
+```mermaid
+flowchart TD
+    A["Cognitive Packet"] --> B["Output Policy Engine"]
+    B --> C["Modality Router"]
+    C --> D["Audio whisper"]
+    C --> E["AR peripheral card"]
+    C --> F["Haptic cue"]
+    C --> G["Phone / screen card"]
+    C --> H["Assistive candidate"]
+    C --> I["Future neural-write research track"]
+```
+
+The practical product family can evolve as:
+
+```text
+SYMBORG App      -> screen/card prototype
+SYMBORG Ear      -> private audio whisper
+SYMBORG Ring     -> haptic control and silence gestures
+SYMBORG Glass    -> AR peripheral cognitive cards
+SYMBORG Band     -> load-aware adaptive delivery
+SYMBORG Assist   -> assistive communication candidate selection
+SYMBORG Neural   -> future BCI-compatible research layer
+```
+
+The most ambitious track is direct sensory output, such as visual cortex stimulation. This should not be claimed as an early product. Current and near-term neural visual systems are better framed as low-bandwidth phosphene or symbolic perceptual interfaces, not screen-like high-resolution image projection.
+
+See [docs/feedback-output-layer.md](docs/feedback-output-layer.md), [docs/device-family-roadmap.md](docs/device-family-roadmap.md), [docs/input-channel-strategy.md](docs/input-channel-strategy.md), [docs/inner-voice-mode.md](docs/inner-voice-mode.md), [docs/neural-write-research-track.md](docs/neural-write-research-track.md), [docs/symborg-output-roadmap.md](docs/symborg-output-roadmap.md), and [docs/output-router-visuals.md](docs/output-router-visuals.md).
+
+Prototype commands:
+
+```bash
+cd prototypes/output-router-demo
+PYTHONPATH=src python -m symborg_output_router.router examples/packets.json
+PYTHONPATH=src python -m unittest discover tests
+```
+
 ## MVP Direction
 
 The first version should not be an implant.
@@ -200,6 +241,13 @@ docs/
   cognitive-packet-engine-spec.md
   evaluation-protocol.md
   latency-and-interruption-model.md
+  feedback-output-layer.md
+  device-family-roadmap.md
+  input-channel-strategy.md
+  inner-voice-mode.md
+  neural-write-research-track.md
+  symborg-output-roadmap.md
+  output-router-visuals.md
   architecture.md
   mvp-v0-contextual-whisper.md
   assistive-communication-mode.md
@@ -220,6 +268,12 @@ prototypes/
     src/symborg/
       packet.py
       heuristic_engine.py
+    examples/
+  output-router-demo/
+    README.md
+    pyproject.toml
+    src/symborg_output_router/
+      router.py
     examples/
 
 references/
