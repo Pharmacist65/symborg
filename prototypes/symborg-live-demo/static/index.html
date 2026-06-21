@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SYMBORG Live Demo</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark" aria-hidden="true"></div>
+          <div>
+            <h1>SYMBORG</h1>
+            <p>Cognitive Packet Pipeline</p>
+          </div>
+        </div>
+        <div class="status-strip">
+          <span id="statusPill" class="status-pill">Ready</span>
+          <span class="repo-note">Context -> packet -> score -> route</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel control-panel" aria-label="Input controls">
+          <div class="panel-heading">
+            <h2>Input</h2>
+            <div class="segmented" role="group" aria-label="Scenario">
+              <button class="segment is-active" data-scenario="dickens">Dickens</button>
+              <button class="segment" data-scenario="meeting">Meeting</button>
+              <button class="segment" data-scenario="clinical">Assistive</button>
+            </div>
+          </div>
+
+          <label class="field-label" for="transcript">Transcript</label>
+          <textarea id="transcript" spellcheck="false"></textarea>
+
+          <div class="control-grid">
+            <label class="control">
+              <span>Delivery</span>
+              <select id="delivery">
+                <option value="screen">Screen</option>
+                <option value="audio_whisper">Audio whisper</option>
+                <option value="ar">AR</option>
+                <option value="haptic">Haptic</option>
+                <option value="assistive">Assistive</option>
+              </select>
+            </label>
+            <label class="control">
+              <span>User signal</span>
+              <select id="userSignal">
+                <option value="none">None</option>
+                <option value="tap">Tap</option>
+                <option value="double_tap">Double tap</option>
+                <option value="long_press">Long press</option>
+                <option value="swipe_up">Swipe up</option>
+                <option value="swipe_down">Swipe down</option>
+                <option value="source_check">Source check</option>
+              </select>
+            </label>
+            <label class="control">
+              <span>Pause</span>
+              <input id="pauseMs" type="number" min="0" max="5000" step="50" value="900" />
+            </label>
+            <label class="control">
+              <span>Min score</span>
+              <input id="minScore" type="number" min="0" max="1" step="0.01" value="0.65" />
+            </label>
+            <label class="range-control">
+              <span>Load</span>
+              <input id="cognitiveLoad" type="range" min="0" max="1" step="0.01" value="0.35" />
+              <strong id="loadValue">0.35</strong>
+            </label>
+          </div>
+
+          <div class="toggle-grid">
+            <label><input id="userSpeaking" type="checkbox" /> Speaking</label>
+            <label><input id="walking" type="checkbox" /> Walking</label>
+            <label><input id="driving" type="checkbox" /> Driving</label>
+            <label><input id="assistiveMode" type="checkbox" /> Assistive UI</label>
+            <label><input id="neuralResearch" type="checkbox" /> Neural research</label>
+          </div>
+
+          <button id="runButton" class="run-button">Run Pipeline</button>
+        </section>
+
+        <section class="panel results-panel" aria-label="Cognitive packet results">
+          <div class="panel-heading">
+            <h2>Packets</h2>
+            <div id="topicBadge" class="topic-badge">unknown</div>
+          </div>
+          <div id="packetList" class="packet-list"></div>
+        </section>
+
+        <aside class="panel route-panel" aria-label="Output routing">
+          <div class="media-slice">
+            <img src="/assets/visuals/02_symborg_product_family.png" alt="SYMBORG device family" />
+          </div>
+          <div class="panel-heading">
+            <h2>Route</h2>
+            <div id="gateBadge" class="gate-badge">gate</div>
+          </div>
+          <div id="routeList" class="route-list"></div>
+          <div class="telemetry">
+            <div>
+              <span>Mean score</span>
+              <strong id="meanScore">0.00</strong>
+            </div>
+            <div>
+              <span>Delivered</span>
+              <strong id="deliveredCount">0</strong>
+            </div>
+            <div>
+              <span>Suppressed</span>
+              <strong id="suppressedCount">0</strong>
+            </div>
+            <div>
+              <span>Best type</span>
+              <strong id="bestType">none</strong>
+            </div>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

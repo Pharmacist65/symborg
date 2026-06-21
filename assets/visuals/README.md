@@ -26,8 +26,8 @@ The intended style is:
 - `09_assistive_medical_use.png`: Assistive communication direction
 - `10_future_use_cases_triptych.png`: Learning, meeting, and social intelligence use cases
 - `contact_sheet_symborg_visuals.png`: Overview sheet
+- `prompts.md`: Source prompt direction for regenerating or extending the visual system
 
 ## Usage Note
 
 These assets are concept visuals. They should not be used to imply an existing manufactured product, clinical validation, or affiliation with any company.
-

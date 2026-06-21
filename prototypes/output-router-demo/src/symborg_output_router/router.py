@@ -137,7 +137,7 @@ def route_packet(
         return RouteDecision("audio_whisper", packet.cue, "audio can deliver a short private cue")
 
     if devices.has_screen:
-        return RouteDecision("screen_card", packet.cue, "fallback to screen card")
+        return RouteDecision("screen_card", packet.cue, "screen card selected as safest available output surface")
 
     return RouteDecision("suppress", "", "no safe output modality available", True)
 

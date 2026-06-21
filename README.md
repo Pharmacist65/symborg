@@ -27,6 +27,7 @@ Brain-computer interfaces focus on decoding neural intent and enabling control. 
 - Demo scenarios for portfolio and prototype development
 - A minimal heuristic contextual whisper prototype
 - A feedback and device output layer with modality routing
+- An integrated browser demo connecting packet generation, quality gating, and routing
 - A launch kit for LinkedIn and X
 - Visual assets for a professional case study, deck, or landing page
 
@@ -192,6 +193,24 @@ PYTHONPATH=src python -m symborg_output_router.router examples/packets.json
 PYTHONPATH=src python -m unittest discover tests
 ```
 
+## Integrated Live Demo
+
+The live demo connects the Contextual Whisper prototype and Output Router into a single local browser interface.
+
+```text
+Transcript -> cognitive packets -> score gate -> modality route -> UI
+```
+
+Run from the repository root:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 prototypes/symborg-live-demo/server.py
+```
+
+Then open `http://127.0.0.1:8765`.
+
+See [prototypes/symborg-live-demo](prototypes/symborg-live-demo).
+
 ## MVP Direction
 
 The first version should not be an implant.
@@ -275,6 +294,11 @@ prototypes/
     src/symborg_output_router/
       router.py
     examples/
+  symborg-live-demo/
+    README.md
+    server.py
+    static/
+    tests/
 
 references/
   sources.md
@@ -282,7 +306,7 @@ references/
 
 ## Current Status
 
-This is an early-stage concept architecture and portfolio case study. The next milestone is a working contextual whisper prototype that takes live or recorded conversation text and returns three ranked micro-cues.
+This is an early-stage concept architecture and portfolio case study with working local prototypes for contextual packet generation, quality gating, output routing, and an integrated browser demo. The next milestone is replacing the heuristic transcript engine with a retrieval-backed live transcription loop and measured latency logs.
 
 ## Collaboration
 
