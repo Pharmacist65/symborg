@@ -28,7 +28,7 @@ Three findings from that map shape everything else in this repository:
 | Finding | Consequence |
 |---|---|
 | The loop is an **hourglass**: ~10⁷–10⁹ bit/s in, **~10–60 bit/s** through conscious access, ~39 bit/s out | The bottleneck is neither the senses nor the muscles. An interface earns its value by deciding what *not* to send. |
-| **The native sensory channel is the widest write path that exists** — ~40–60 bit/s, versus ~0.1–1 bit/s for cortical stimulation | Going in through the ear, eye, or skin is not a compromise. On today's numbers it beats every implanted alternative by one to two orders of magnitude. |
+| **The native sensory channel is the widest write path that exists** — tens of bit/s through ear and eye, 5–12 bit/s for engineered tactile, versus ~0.1–1 bit/s for cortical stimulation | Going in through the senses is not a compromise. But it is a design constraint, not a business case: Neosensory executed this thesis with capital and clinical data, and still ceased operations in 2025. |
 | A body-powered implant running a language model yields **about one token per hour** | Computation belongs on the phone and in a wearable accelerator — not inside the body. |
 
 ---

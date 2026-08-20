@@ -28,9 +28,18 @@ nor the muscles — it is central, and it does not widen. Any system that increa
 pressure on a saturated channel makes the person slower.
 
 **The native sensory channel is the widest write path that exists.** Writing through the
-ear, eye or skin carries ~40–60 bit/s. The best cortical stimulation manages ~0.1–1 bit/s.
-Choosing the sensory route is not a limitation accepted for lack of resources; on today's
-numbers it beats every implanted alternative by one to two orders of magnitude.
+ear or eye is on the order of tens of bits per second — the ~40–60 bit/s figure quoted for
+this route is a literature estimate for the channel, not a measured property of any
+device, and should be treated as an upper bound. Skin is markedly lower: engineered
+tactile devices achieve 5–12 bit/s, against ~22 bit/s for Tadoma, the human ceiling. Even
+so, the best cortical stimulation manages ~0.1–1 bit/s. Choosing the sensory route is not
+a limitation accepted for lack of resources; on today's numbers it beats every implanted
+alternative by one to two orders of magnitude.
+
+**This is a design constraint, not a business case.** Neosensory ceased operations in
+February 2025 having executed precisely this thesis — with a neuroscientist founder,
+capital, clinical data and a shipping product. The bandwidth argument tells you where to
+build. It does not tell you that a company exists there.
 
 **Computation cannot live in the body.** Energy harvested in vivo is on the order of
 39 µW. A single token of language-model inference on an edge device costs 52–271 mJ. That
