@@ -18,7 +18,8 @@ The project does **not** propose uploading knowledge into the brain. It asks a n
 
 ## Start Here: the map this project is built on
 
-**→ [Signal to Response: A Map of the Human Interaction Loop](docs/signal-to-response.md)**
+**→ [Signal to Response: A Map of the Human Interaction Loop](docs/signal-to-response.md)** — what the system is, physically
+**→ [The Human–LLM Integration Stack](docs/integration-stack.md)** — the architecture that follows from it, and the problems we cannot solve alone
 
 Before designing an interface, we wrote down the system it intervenes in: the path a signal takes from the world, through the senses, into the brain, to conscious access, to intention, and back out as an action — with each stage's latency, its information throughput, and whether a device can act there today.
 
@@ -285,6 +286,8 @@ More visuals are in [assets/visuals](assets/visuals).
 ```text
 docs/
   signal-to-response.md   <- start here
+  integration-stack.md
+  engine-implementation-spec.md
   one-page-brief.md
   whitepaper.md
   brain-thought-model.md
