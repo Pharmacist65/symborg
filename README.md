@@ -1,5 +1,9 @@
 # SYMBORG
 
+[![tests](https://github.com/Pharmacist65/symborg/actions/workflows/tests.yml/badge.svg)](https://github.com/Pharmacist65/symborg/actions/workflows/tests.yml)
+[![status: research prototype](https://img.shields.io/badge/status-research%20prototype-2F8F89)](docs/signal-to-response.md)
+[![not a medical device](https://img.shields.io/badge/not%20a-medical%20device-DE6047)](#disclaimer)
+
 ![SYMBORG hero](assets/visuals/01_symborg_hero_vision.png)
 
 **A symbiotic cognitive front-end layer for human-AI interaction.**
@@ -9,6 +13,24 @@ SYMBORG is a product and research concept for a non-invasive cognitive interface
 The project does **not** propose uploading knowledge into the brain. It asks a narrower and more practical question:
 
 > If AI can retrieve more information than a person can hold in attention, what is the right interface for returning that information to human consciousness without disrupting agency, attention, or social presence?
+
+---
+
+## Start Here: the map this project is built on
+
+**→ [Signal to Response: A Map of the Human Interaction Loop](docs/signal-to-response.md)**
+
+Before designing an interface, we wrote down the system it intervenes in: the path a signal takes from the world, through the senses, into the brain, to conscious access, to intention, and back out as an action — with each stage's latency, its information throughput, and whether a device can act there today.
+
+Three findings from that map shape everything else in this repository:
+
+| Finding | Consequence |
+|---|---|
+| The loop is an **hourglass**: ~10⁷–10⁹ bit/s in, **~10–60 bit/s** through conscious access, ~39 bit/s out | The bottleneck is neither the senses nor the muscles. An interface earns its value by deciding what *not* to send. |
+| **The native sensory channel is the widest write path that exists** — ~40–60 bit/s, versus ~0.1–1 bit/s for cortical stimulation | Going in through the ear, eye, or skin is not a compromise. On today's numbers it beats every implanted alternative by one to two orders of magnitude. |
+| A body-powered implant running a language model yields **about one token per hour** | Computation belongs on the phone and in a wearable accelerator — not inside the body. |
+
+---
 
 ## Core Positioning
 
@@ -262,6 +284,7 @@ More visuals are in [assets/visuals](assets/visuals).
 
 ```text
 docs/
+  signal-to-response.md   <- start here
   one-page-brief.md
   whitepaper.md
   brain-thought-model.md
@@ -332,6 +355,24 @@ I am interested in thoughtful feedback from people working in:
 - Product design for attention-sensitive systems
 
 See [docs/collaboration-strategy.md](docs/collaboration-strategy.md).
+
+## License and Citation
+
+This repository is licensed in three parts:
+
+| Part | Licence |
+|---|---|
+| Code (`prototypes/`, CI config) | [Apache 2.0](LICENSE-APACHE) — use, modify, redistribute, including commercially |
+| Documentation (`docs/`, README) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — share and adapt with attribution |
+| SYMBORG name, wordmark, visual assets | All rights reserved |
+
+See [LICENSE](LICENSE) for the full terms. If you refer to this work academically,
+please cite it using [CITATION.cff](CITATION.cff) — GitHub's "Cite this repository"
+button generates BibTeX and APA from it.
+
+Corrections are welcome and wanted: if a number or a claim here is wrong, please
+open a [scientific correction issue](.github/ISSUE_TEMPLATE/scientific_correction.md)
+with a primary source. This project would rather be accurate than impressive.
 
 ## Disclaimer
 

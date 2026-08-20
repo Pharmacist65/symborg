@@ -1,3 +1,6 @@
+# Private strategy / recruiting / fundraising (never publish)
+_private/
+
 # Local notes and draft exports
 *.docx
 *.pdf

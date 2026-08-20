@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: "SYMBORG: A Cognitive Front-End Layer for Human-AI Interaction"
+message: "If you refer to this work, please cite it as below."
+type: software
+authors:
+  - family-names: Akman
+    given-names: Cihangir
+repository-code: "https://github.com/Pharmacist65/symborg"
+abstract: >-
+  SYMBORG is a research and design project on the interface contract between
+  AI retrieval systems and human attention. It maps the human signal-to-response
+  loop, identifies where a non-invasive device can realistically intervene, and
+  prototypes a cognitive packet engine that compresses retrieved context into
+  brief, timed, agency-preserving cues — with assistive communication for people
+  who cannot speak as its primary application.
+keywords:
+  - human-computer interaction
+  - augmentative and alternative communication
+  - assistive technology
+  - attention
+  - cognitive load
+  - brain-computer interface
+  - accessibility
+license: Apache-2.0
+license-url: "https://github.com/Pharmacist65/symborg/blob/main/LICENSE"

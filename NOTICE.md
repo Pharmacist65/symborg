@@ -8,3 +8,8 @@ This repository does not describe a medical device, does not provide medical adv
 
 Any future assistive communication prototype should be treated as a non-clinical research demonstration unless reviewed under the appropriate ethical, legal, and regulatory pathway.
 
+## Licensing
+
+This repository uses a split licence: code under Apache 2.0, documentation under
+CC BY 4.0, and the SYMBORG name, wordmark, and visual assets reserved.
+See [LICENSE](LICENSE) for the full terms.

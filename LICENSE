@@ -1,6 +1,47 @@
+# SYMBORG — Licensing
+
+This repository is licensed in three parts, so that the research can be built on
+and cited freely while the project's identity remains with its author.
+
+## 1. Code — Apache License 2.0
+
+Everything under `prototypes/`, all build and CI configuration, and any other
+source code in this repository is licensed under the Apache License, Version 2.0.
+See [LICENSE-APACHE](LICENSE-APACHE) for the full text.
+
+You may use, modify, and redistribute the code, including commercially, provided
+you retain the notices required by that licence. Apache 2.0 also grants an
+express patent licence from contributors.
+
+## 2. Documentation and research — CC BY 4.0
+
+Everything under `docs/`, plus `README.md`, `CONTRIBUTING.md`, and `NOTICE.md`,
+is licensed under the Creative Commons Attribution 4.0 International licence
+(CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
+
+You may share and adapt this material, including commercially, provided you give
+appropriate credit and indicate whether changes were made. For academic use,
+please cite the repository — see [CITATION.cff](CITATION.cff).
+
+## 3. Brand, name, and visual assets — all rights reserved
+
+The following are **not** covered by the licences above and remain the exclusive
+property of the copyright holder:
+
+- The name **SYMBORG** and any confusingly similar mark
+- The wordmark, logo, and visual identity
+- All images under `assets/visuals/` and `SYMBORG_visuals/`
+- The product concept naming (SYMBORG App / Ear / Ring / Glass / Assist / Neural)
+
+You may reproduce these only as needed to refer to this project accurately —
+for example, when citing it or linking to it. You may not use them to name,
+brand, or market your own product or service, or in any way that implies
+endorsement by or affiliation with this project, without prior written
+permission.
+
+---
+
 Copyright (c) 2026 Cihangir Akman
 
-All rights reserved.
-
-This repository is shared as a portfolio, research, and concept-development artifact. No permission is granted to copy, modify, distribute, sublicense, or use the project name, visual assets, written materials, product concepts, or brand direction for commercial or derivative purposes without explicit written permission from the copyright holder.
-
+Trade marks, product names, and company names referred to in the documentation
+belong to their respective owners and are used for identification only.
