@@ -22,9 +22,10 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-llm = ["anthropic>=0.40"]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.40"]
 asr = ["openai-whisper>=20231117"]
-all = ["symborg-engine[llm,asr]"]
+all = ["symborg-engine[anthropic,openai,asr]"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

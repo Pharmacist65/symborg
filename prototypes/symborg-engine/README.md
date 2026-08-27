@@ -77,14 +77,24 @@ empty offer marked `degraded` — never an invented sentence.
 
 ## Using a real model
 
+The engine is vendor-neutral by construction: which company supplies the model is
+configuration, not code. Install the extra for whichever you use and set its key in
+your environment — never in a file, and never in a prompt.
+
 ```bash
-pip install '.[llm]'
-export ANTHROPIC_API_KEY=...
+pip install '.[openai]'      # or '.[anthropic]', or '.[all]'
+export OPENAI_API_KEY=...    # or ANTHROPIC_API_KEY
 ```
 
-The same code path then runs against a hosted model. With no key set, the engine falls
-back to the offline provider with a warning; it never fails and never quietly sends
-data anywhere.
+| Variable | Purpose |
+|---|---|
+| `SYMBORG_LLM_PROVIDER` | `offline` \| `anthropic` \| `openai` — optional; auto-detected from the keys present |
+| `SYMBORG_LLM_MODEL` | override the model id |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | credentials, read from the environment only |
+
+The same code path runs against any of them; swapping providers touches no engine
+logic. With no key set the engine falls back to the offline provider with a warning —
+it never fails, and it never quietly sends data anywhere.
 
 ## Latency
 
