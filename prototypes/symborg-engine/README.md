@@ -92,6 +92,12 @@ export OPENAI_API_KEY=...    # or ANTHROPIC_API_KEY
 | `SYMBORG_LLM_MODEL` | override the model id |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | credentials, read from the environment only |
 
+To check what the engine will actually use — without printing your key:
+
+```bash
+PYTHONPATH=src python3 -m symborg_engine.doctor
+```
+
 The same code path runs against any of them; swapping providers touches no engine
 logic. With no key set the engine falls back to the offline provider with a warning —
 it never fails, and it never quietly sends data anywhere.
