@@ -258,3 +258,51 @@ class TestStreamDriving(unittest.TestCase):
 
         turns = drive(Session(model=_Model()), TextStream(["", "   ", "Ağrın var mı"]))
         self.assertEqual(len(turns), 1)
+
+
+class TestCumulativeFragments(unittest.TestCase):
+    """Recognisers that assemble their own transcript must not be re-assembled.
+
+    These pin the behaviour a live transcription stream depends on: deltas may split
+    mid-word, so a source that has already joined them says so and the monitor
+    replaces rather than appends.
+    """
+
+    def test_cumulative_replaces_rather_than_appends(self) -> None:
+        monitor = TurnMonitor()
+        monitor.observe("Ağrın", cumulative=True)
+        monitor.observe("Ağrın var", cumulative=True)
+        monitor.observe("Ağrın var mı", cumulative=True)
+        self.assertEqual(monitor.partial, "Ağrın var mı")
+
+    def test_incremental_still_appends(self) -> None:
+        monitor = TurnMonitor()
+        monitor.observe("Ağrın")
+        monitor.observe("var mı")
+        self.assertEqual(monitor.partial, "Ağrın var mı")
+
+    def test_mid_word_deltas_do_not_gain_spaces(self) -> None:
+        """The failure this flag exists to prevent."""
+        monitor = TurnMonitor()
+        for assembled in ["Ağr", "Ağrın", "Ağrın v", "Ağrın var mı"]:
+            monitor.observe(assembled, cumulative=True)
+        self.assertEqual(monitor.partial, "Ağrın var mı")
+        self.assertNotIn("Ağr ın", monitor.partial)
+
+    def test_cumulative_still_fires_the_gate(self) -> None:
+        monitor = TurnMonitor()
+        self.assertFalse(monitor.observe("Ağrın", cumulative=True).fired)
+        self.assertTrue(monitor.observe("Ağrın var mı", cumulative=True).fired)
+
+    def test_empty_final_fragment_closes_the_turn(self) -> None:
+        """A recogniser signals end-of-utterance without necessarily sending text."""
+        from symborg_engine import Fragment, drive
+
+        class _Stream:
+            def __iter__(self):
+                yield Fragment("Ağrın var mı", cumulative=True)
+                yield Fragment("", is_final=True)
+
+        turns = drive(Session(model=_Model()), _Stream())
+        self.assertEqual(len(turns), 1)
+        self.assertEqual(len(turns[0].result.candidates), 3)

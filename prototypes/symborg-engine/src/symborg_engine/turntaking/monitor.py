@@ -107,15 +107,20 @@ class TurnMonitor:
     _fired: bool = field(default=False, init=False, repr=False)
     _started_ms: int = field(default=0, init=False, repr=False)
 
-    def observe(self, text: str) -> TurnSignal:
+    def observe(self, text: str, cumulative: bool = False) -> TurnSignal:
         """Add what has just been heard and re-evaluate.
 
         Args:
-            text: The next fragment of the current turn, not the whole turn.
+            text: The next fragment of the current turn, or — when ``cumulative`` is
+                set — everything heard of it so far.
+            cumulative: Whether ``text`` replaces the running partial rather than
+                extending it. Sources that already assemble the transcript set this,
+                which avoids having to guess where word boundaries fall in a stream
+                that may split mid-word.
         """
         if self._started_ms == 0:
             self._started_ms = _now_ms()
-        self._partial = f"{self._partial} {text}".strip()
+        self._partial = text.strip() if cumulative else f"{self._partial} {text}".strip()
 
         probability = float(self.predictor.probability(self._partial))
         fire = not self._fired and probability >= self.threshold

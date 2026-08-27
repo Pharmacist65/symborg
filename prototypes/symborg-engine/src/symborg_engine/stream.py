@@ -30,6 +30,13 @@ class Fragment:
     """True on the fragment that ends the turn — the speaker has stopped."""
     at_ms: int = 0
     """Milliseconds since the turn began, if the source reports it."""
+    cumulative: bool = False
+    """Whether ``text`` is the whole turn so far rather than an increment.
+
+    Recognisers differ: some emit word-level increments, some revise and re-emit the
+    running transcript, and some split mid-word. A source that has already assembled
+    the partial says so here, and the monitor replaces instead of appending — which
+    removes any need to guess where a space belongs."""
 
 
 @runtime_checkable
@@ -112,12 +119,15 @@ def drive(
     fired_at: int | None = None
 
     for fragment in stream:
-        if not fragment.text.strip():
+        # A blank fragment is skipped unless it closes the turn: a recogniser signals
+        # the end of an utterance without necessarily carrying more text.
+        if not fragment.text.strip() and not fragment.is_final:
             continue
 
-        signal = session.hear_partial(fragment.text)
-        if signal.fired and fired_at is None:
-            fired_at = fragment.at_ms
+        if fragment.text.strip():
+            signal = session.hear_partial(fragment.text, cumulative=fragment.cumulative)
+            if signal.fired and fired_at is None:
+                fired_at = fragment.at_ms
 
         if fragment.is_final:
             partial = session.monitor.partial

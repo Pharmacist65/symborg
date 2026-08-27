@@ -160,6 +160,43 @@ for fragment in incoming_speech:
 result = session.offer()        # returns immediately; result.speculative is True
 ```
 
+### Live audio
+
+Speech capture, streaming recognition and voice-activity detection are solved
+engineering, so the engine adopts them rather than rebuilding them. The transcript
+source sits behind one protocol; the OpenAI Realtime API is one implementation of it.
+
+```bash
+pip install '.[realtime]'
+```
+
+```python
+from symborg_engine import Session, drive
+from symborg_engine.providers.realtime_stream import MicrophoneSource, RealtimeTranscriptStream
+
+session = Session()
+with MicrophoneSource() as mic:
+    drive(session, RealtimeTranscriptStream(mic.blocks()),
+          on_turn=lambda t: print(t.lead_ms, [c.text for c in t.result.candidates]))
+```
+
+It runs a **transcription-only** session: the model listens and never replies. SYMBORG
+is not a participant in the conversation — it prepares options for one.
+
+**What that API does not supply is anticipation, and this is the reason the predictor
+still exists.** Every turn-boundary event it emits fires after silence has been
+observed, and the speech-stopped event includes the silence window by construction. The
+classifier that scores whether a speaker has finished is consumed internally to set a
+timeout and is never exposed. What the API does give — transcript deltas arriving while
+the partner is still speaking — is exactly what the predictor needs to run on.
+
+There is a second reason, and it is the one that matters more in use. Since deltas
+arrive continuously, a system could simply regenerate on every one and always hold
+fresh candidates. But then the options on screen keep changing while the person is
+trying to read them — and this is a person who may read slowly and select with a single
+switch. The predictor's real job is to say *commit now, stop changing*. It is less a
+latency optimisation than a legibility guarantee.
+
 ### How good is the predictor
 
 `eval/turn_end.py` scores it on the two errors that cost something, which are not

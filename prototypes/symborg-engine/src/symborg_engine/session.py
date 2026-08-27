@@ -118,7 +118,7 @@ class Session:
         self.transcript.add_text(text, speaker=speaker)
         self.monitor.reset()
 
-    def hear_partial(self, text: str) -> TurnSignal:
+    def hear_partial(self, text: str, cumulative: bool = False) -> TurnSignal:
         """Feed a fragment of speech that is still in progress.
 
         This is the entry point the whole design turns on. Each fragment is scored for
@@ -129,7 +129,7 @@ class Session:
         Returns:
             The signal for this fragment, including whether generation was triggered.
         """
-        signal = self.monitor.observe(text)
+        signal = self.monitor.observe(text, cumulative=cumulative)
         if signal.fired:
             self._speculate(self.monitor.partial)
         return signal
