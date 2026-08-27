@@ -179,7 +179,7 @@ PYTHONPATH=src python -m unittest discover tests
 
 ## Feedback and Device Layer
 
-SYMBORG should be treated as a family of output interfaces, not a single device. After the Cognitive Packet Engine creates a thought seed, an Output Policy Engine decides whether the cue should be returned, and a Modality Router decides how it should be returned: audio whisper, AR card, haptic cue, screen card, assistive sentence candidate, or future neural-write research output.
+SYMBORG should be treated as a family of output interfaces, not a single device. After the Cognitive Packet Engine creates a thought seed, an Output Policy Engine decides whether the cue should be returned, and a Modality Router decides how it should be returned: audio whisper, AR card, haptic cue, screen card, or assistive sentence candidate.
 
 ```mermaid
 flowchart TD
@@ -190,7 +190,6 @@ flowchart TD
     C --> F["Haptic cue"]
     C --> G["Phone / screen card"]
     C --> H["Assistive candidate"]
-    C --> I["Future neural-write research track"]
 ```
 
 The practical product family can evolve as:
@@ -202,12 +201,11 @@ SYMBORG Ring     -> haptic control and silence gestures
 SYMBORG Glass    -> AR peripheral cognitive cards
 SYMBORG Band     -> load-aware adaptive delivery
 SYMBORG Assist   -> assistive communication candidate selection
-SYMBORG Neural   -> future BCI-compatible research layer
 ```
 
-The most ambitious track is direct sensory output, such as visual cortex stimulation. This should not be claimed as an early product. Current and near-term neural visual systems are better framed as low-bandwidth phosphene or symbolic perceptual interfaces, not screen-like high-resolution image projection.
+Every route above goes through a sense the person already has. SYMBORG does not propose implanted hardware or stimulation of neural tissue — not as a limitation accepted for now, but because the measurements say the natural sensory channel is the widest write path available by one to two orders of magnitude. See [Signal to Response](docs/signal-to-response.md).
 
-See [docs/feedback-output-layer.md](docs/feedback-output-layer.md), [docs/device-family-roadmap.md](docs/device-family-roadmap.md), [docs/input-channel-strategy.md](docs/input-channel-strategy.md), [docs/inner-voice-mode.md](docs/inner-voice-mode.md), [docs/neural-write-research-track.md](docs/neural-write-research-track.md), [docs/symborg-output-roadmap.md](docs/symborg-output-roadmap.md), and [docs/output-router-visuals.md](docs/output-router-visuals.md).
+See [docs/feedback-output-layer.md](docs/feedback-output-layer.md), [docs/device-family-roadmap.md](docs/device-family-roadmap.md), [docs/input-channel-strategy.md](docs/input-channel-strategy.md), [docs/inner-voice-mode.md](docs/inner-voice-mode.md), [docs/symborg-output-roadmap.md](docs/symborg-output-roadmap.md), and [docs/output-router-visuals.md](docs/output-router-visuals.md).
 
 Prototype commands:
 
@@ -300,7 +298,6 @@ docs/
   device-family-roadmap.md
   input-channel-strategy.md
   inner-voice-mode.md
-  neural-write-research-track.md
   symborg-output-roadmap.md
   output-router-visuals.md
   architecture.md

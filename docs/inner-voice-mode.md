@@ -4,23 +4,15 @@ SYMBORG Inner Voice is the output mode where AI feedback feels like a quiet comp
 
 It should not be framed as literal voice implantation in the early versions. The first implementation is external but intimate: bone-conduction or open-ear audio.
 
-## Two meanings of inner voice
+## What inner voice means here
 
-### 1. Practical inner voice
+### Practical inner voice
 
 ```text
 A very quiet, private audio whisper delivered through an earpiece.
 ```
 
 This is realistic now.
-
-### 2. Neural inner voice
-
-```text
-Direct decoding or writing of inner speech through a BCI.
-```
-
-This is clinical/research territory and must be treated with extreme privacy protections.
 
 ## Practical inner voice design
 

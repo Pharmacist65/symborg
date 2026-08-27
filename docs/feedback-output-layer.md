@@ -29,7 +29,6 @@ Modality Router
     +--> AR peripheral card
     +--> Phone/screen card
     +--> Assistive sentence candidate
-    +--> Future neural-write research output
     |
     v
 Human attention / perception / expression
@@ -166,15 +165,6 @@ Use haptics mainly for status, urgency, control, and very simple signals.
 Candidate count: 2-4
 Each candidate: short, speakable, confirmable
 Must support undo/cancel
-```
-
-### Neural-write research output
-
-```text
-Not a consumer v1 feature.
-Do not claim screen-like perception.
-Use only as a future clinical/research track.
-Prefer symbolic low-bandwidth percepts over complex images.
 ```
 
 ## Feedback loop

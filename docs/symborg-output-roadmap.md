@@ -11,7 +11,6 @@ v2  AR peripheral cards
 v3  Physiology-aware adaptive delivery
 v4  Assistive communication terminal
 v5  BCI-compatible intent selection
-v6  Neural-write research layer
 ```
 
 ## v0: Screen cards
@@ -89,21 +88,6 @@ select candidate A/B/C
 confirm/cancel
 open/close output
 request depth
-```
-
-## v6: Neural-write research layer
-
-Goal: explore direct sensory output as symbolic perceptual cues.
-
-Do not attempt full internal screen reproduction.
-
-Start with:
-
-```text
-phosphene-like AR simulation
-symbol learning
-low-bandwidth glyphs
-closed-loop calibration concepts
 ```
 
 ## The key design shift

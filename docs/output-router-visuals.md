@@ -18,7 +18,6 @@ flowchart TD
     H --> K["AR peripheral card"]
     H --> L["Phone / screen card"]
     H --> M["Assistive sentence candidate"]
-    H --> N["Future neural-write research glyph"]
     I --> O["Human attention / perception"]
     J --> O
     K --> O
@@ -66,5 +65,5 @@ flowchart TD
 
 ## Design Note
 
-The neural-write branch is intentionally framed as a future research track. It is not an early consumer feature and should not be presented as high-resolution internal display technology.
+Every branch above delivers through a sense the person already has. There is no branch that writes to neural tissue, by design.
 

@@ -2,6 +2,11 @@
 
 SYMBORG should not be framed as one device. It should be framed as a family of symbiotic cognitive interfaces, moving from realistic wearable products to future BCI-compatible research systems.
 
+> **Scope note.** This roadmap describes non-invasive devices only. SYMBORG does not
+> propose implanted hardware or stimulation of neural tissue: the return path runs
+> through the senses a person already has. See [signal-to-response.md](signal-to-response.md)
+> for the measurements behind that decision.
+
 ## Device family overview
 
 ```text
@@ -196,27 +201,6 @@ SYMBORG candidates:
 
 This is the strongest serious demo because it connects SYMBORG to autonomy, dignity, and communication.
 
-## 7. SYMBORG Neural
-
-**Type:** future research and BCI-compatible output layer.
-
-This is not an early consumer claim.
-
-Possible tracks:
-
-- BCI input: user intent selection
-- visual cortex output research: low-resolution phosphene patterns
-- auditory/speech neuroprosthesis integration
-- somatosensory stimulation for tactile codes
-- closed-loop calibration and safety
-
-Positioning:
-
-```text
-SYMBORG does not need to build the implant.
-SYMBORG can become the cognitive UX layer that sits above implants.
-```
-
 ## Product sequence
 
 ```text
@@ -225,8 +209,6 @@ Phase 1: Ear + Ring
 Phase 2: Glass + local memory vault
 Phase 3: Band / load awareness
 Phase 4: Assistive communication terminal
-Phase 5: BCI-compatible research integrations
-Phase 6: Neural-write clinical research concepts
 ```
 
 ## Naming suggestions
