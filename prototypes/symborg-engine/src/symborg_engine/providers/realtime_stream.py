@@ -21,6 +21,7 @@ import asyncio
 import base64
 import queue
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Iterator
 
@@ -30,8 +31,23 @@ from ..tls import ensure_trust_store
 __all__ = ["RealtimeTranscriptStream", "MicrophoneSource", "TRANSCRIBE_MODEL"]
 
 TRANSCRIBE_MODEL = "gpt-live-transcribe"
-"""Streaming transcription. Emits transcript deltas as speech arrives, which is the
-property the whole design depends on."""
+"""Streaming transcription. Verified against the live API: it emits deltas while the
+speaker is still talking, which is the one property the whole design depends on. The
+alternatives that do support server-side turn detection returned nothing until the
+buffer was committed, which would be useless here."""
+
+TURN_GAP_MS = 1_400
+"""Silence, measured as a gap between deltas, that ends a turn.
+
+This model does not support server-side turn detection — and does not need to, because
+the predictor is what decides a turn is ending. This is only the backstop that closes
+the turn once the speaker has actually stopped.
+
+Set from measurement rather than intuition. At 700 ms a single Turkish question was
+split in two, because deltas do not arrive evenly: an 830 ms gap appeared inside one
+sentence while the recogniser caught up. The cost of being late here is small — the
+predictor has already committed and the candidates are waiting — while the cost of
+being early is cutting someone off mid-sentence."""
 
 SAMPLE_RATE = 24_000
 """The API accepts 24 kHz mono PCM16 only."""
@@ -96,24 +112,27 @@ class RealtimeTranscriptStream:
             drive(session, stream)
     """
 
-    def __init__(self, audio_blocks: Iterator[bytes], languages: tuple[str, ...] = ("tr", "en"),
-                 eagerness: str = "high", api_key: str | None = None) -> None:
+    def __init__(self, audio_blocks: Iterator[bytes], language: str = "tr",
+                 turn_gap_ms: int = TURN_GAP_MS, api_key: str | None = None,
+                 drain_s: float = 3.0) -> None:
         """
         Args:
             audio_blocks: 24 kHz mono PCM16 blocks.
-            languages: Hints for the recogniser. The API rejects unsupported codes,
-                which makes a session update a cheap way to confirm support.
-            eagerness: Caps how long the server waits before declaring a turn over.
-                "high" keeps that tail short; it does not make the API anticipate,
-                which nothing it offers does.
+            language: Recogniser hint.
+            turn_gap_ms: Silence between deltas that closes a turn. Only a backstop —
+                the predictor is what decides a turn is *about* to end.
+            drain_s: How long to keep listening after the audio source ends, so the
+                final transcript arrives before the session closes.
         """
         self._audio = audio_blocks
-        self._languages = list(languages)
-        self._eagerness = eagerness
+        self._language = language
+        self._turn_gap_ms = turn_gap_ms
         self._api_key = api_key
+        self._drain_s = drain_s
         self._out: queue.Queue = queue.Queue()
         self._thread: threading.Thread | None = None
         self._error: BaseException | None = None
+        self._last_delta: float | None = None
 
     def __iter__(self) -> Iterator[Fragment]:
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -149,13 +168,24 @@ class RealtimeTranscriptStream:
             ) from exc
 
         client = AsyncOpenAI(api_key=self._api_key)
-        async with client.realtime.connect() as conn:
+        # A transcription session is opened by intent, not by naming a model in the
+        # handshake — passing a transcription model there is rejected outright, and
+        # omitting the intent opens a conversational session that refuses this config.
+        async with client.realtime.connect(extra_query={"intent": "transcription"}) as conn:
             await conn.session.update(session=self._session_config())
             pump = asyncio.create_task(self._pump(conn))
-            try:
-                await self._consume(conn)
-            finally:
-                pump.cancel()
+            consume = asyncio.create_task(self._consume(conn))
+            # Whichever finishes first ends the session: the audio source running out
+            # is a normal end, not a reason to sit waiting for events that will never
+            # come.
+            done, pending = await asyncio.wait(
+                {pump, consume}, return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+            for task in done:
+                if task.exception() is not None:
+                    raise task.exception()
 
     def _session_config(self) -> dict:
         return {
@@ -168,10 +198,12 @@ class RealtimeTranscriptStream:
                     "noise_reduction": {"type": "far_field"},
                     "transcription": {
                         "model": TRANSCRIBE_MODEL,
-                        "languages": self._languages,
-                        "delay": "minimal",
+                        "language": self._language,
                     },
-                    "turn_detection": {"type": "semantic_vad", "eagerness": self._eagerness},
+                    # Deliberately no turn_detection. This model rejects it, and the
+                    # models that accept it do not stream deltas — which would remove
+                    # the only thing that makes anticipation possible. Turn boundaries
+                    # are decided here instead, which is where they belong.
                 }
             },
         }
@@ -183,36 +215,70 @@ class RealtimeTranscriptStream:
         while True:
             block = await loop.run_in_executor(None, lambda: next(iterator, None))
             if block is None:
+                # The source is exhausted. Commit whatever is buffered so the last turn
+                # is transcribed, then give the server a moment to send it.
+                try:
+                    await conn.input_audio_buffer.commit()
+                except Exception:
+                    pass
+                await asyncio.sleep(self._drain_s)
                 return
             await conn.input_audio_buffer.append(audio=base64.b64encode(block).decode())
 
     async def _consume(self, conn) -> None:
-        """Translate server events into fragments.
+        """Translate server events into fragments, and close turns on silence.
 
         Deltas are the point: they arrive while the partner is still speaking, which is
-        what lets the predictor commit before the turn ends.
+        what lets the predictor commit before the turn ends. They also split mid-word
+        — verified against the live API, which sent "Ağ", "r", "ın" as three events —
+        so they are concatenated verbatim and the assembled partial is emitted whole.
         """
         partial = ""
-        async for event in conn:
-            kind = getattr(event, "type", "")
+        started = time.monotonic()
+        watchdog = asyncio.create_task(self._close_on_silence(conn))
+        try:
+            async for event in conn:
+                kind = getattr(event, "type", "")
 
-            if kind == "conversation.item.input_audio_transcription.delta":
-                # Deltas are concatenated verbatim: they may split mid-word, so
-                # inserting separators here would corrupt the text. The assembled
-                # partial is emitted whole and the monitor replaces rather than appends.
-                partial += getattr(event, "delta", "") or ""
-                if partial.strip():
-                    self._out.put(Fragment(text=partial, is_final=False, cumulative=True))
+                if kind == "conversation.item.input_audio_transcription.delta":
+                    partial += getattr(event, "delta", "") or ""
+                    self._last_delta = time.monotonic()
+                    if partial.strip():
+                        self._out.put(Fragment(
+                            text=partial, is_final=False, cumulative=True,
+                            at_ms=int((time.monotonic() - started) * 1000),
+                        ))
 
-            elif kind == "conversation.item.input_audio_transcription.completed":
-                partial = ""
-                # The turn is over. An empty final fragment closes it without
-                # duplicating text the deltas already delivered.
-                self._out.put(Fragment(text="", is_final=True))
+                elif kind in ("conversation.item.input_audio_transcription.completed",
+                              "conversation.item.input_audio_transcription.failed"):
+                    if partial.strip():
+                        # Carry the elapsed time: this is the turn-end timestamp the
+                        # lead measurement is taken against.
+                        self._out.put(Fragment(
+                            text="", is_final=True,
+                            at_ms=int((time.monotonic() - started) * 1000),
+                        ))
+                    partial = ""
+                    started = time.monotonic()
 
-            elif kind == "conversation.item.input_audio_transcription.failed":
-                partial = ""
-                self._out.put(Fragment(text="", is_final=True))
+                elif kind == "error":
+                    raise RuntimeError(f"realtime_error: {getattr(event, 'error', event)}")
+        finally:
+            watchdog.cancel()
 
-            elif kind == "error":
-                raise RuntimeError(f"realtime_error: {getattr(event, 'error', event)}")
+    async def _close_on_silence(self, conn) -> None:
+        """Commit the buffer once the speaker has stopped.
+
+        Without server-side turn detection nothing else ends a turn, so this watches
+        for a gap between deltas and commits, which produces the completed event.
+        """
+        while True:
+            await asyncio.sleep(0.1)
+            if self._last_delta is None:
+                continue
+            if (time.monotonic() - self._last_delta) * 1000 >= self._turn_gap_ms:
+                self._last_delta = None
+                try:
+                    await conn.input_audio_buffer.commit()
+                except Exception:
+                    return

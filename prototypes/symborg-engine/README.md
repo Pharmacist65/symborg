@@ -183,6 +183,17 @@ with MicrophoneSource() as mic:
 It runs a **transcription-only** session: the model listens and never replies. SYMBORG
 is not a participant in the conversation — it prepares options for one.
 
+The configuration was arrived at by probing the live API, because the documentation
+does not make the constraint obvious. A transcription session is opened by `intent`
+rather than by naming a model in the handshake; `gpt-live-transcribe` is the model that
+streams deltas while someone is still speaking; and it does not accept server-side turn
+detection. The models that do accept turn detection returned nothing until the buffer
+was committed — which would remove the only thing that makes anticipation possible. So
+turn boundaries are decided here instead, which is where they belong.
+
+Verified end to end against synthesised Turkish speech: one turn, transcribed whole,
+candidates already waiting when it ended.
+
 **What that API does not supply is anticipation, and this is the reason the predictor
 still exists.** Every turn-boundary event it emits fires after silence has been
 observed, and the speech-stopped event includes the silence window by construction. The
