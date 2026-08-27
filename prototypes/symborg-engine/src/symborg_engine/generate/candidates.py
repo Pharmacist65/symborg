@@ -19,7 +19,34 @@ from .prompts import (
     build_candidate_prompt, build_expansion_prompt,
 )
 
-__all__ = ["generate_candidates", "expand_abbreviation", "parse_candidates", "dedupe"]
+__all__ = ["generate_candidates", "expand_abbreviation", "parse_candidates", "dedupe",
+           "CANDIDATE_SCHEMA"]
+
+CANDIDATE_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "candidates": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string"},
+                    "kind": {"type": "string",
+                             "enum": ["reply", "need", "question", "repair", "social"]},
+                    "confidence": {"type": "number"},
+                },
+                "required": ["text", "kind", "confidence"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["candidates"],
+    "additionalProperties": False,
+}
+"""Shape offered to providers that support constrained decoding.
+
+Wrapped in an object because strict structured outputs cannot return a top-level
+array. Providers that ignore it still work — the parser accepts either shape."""
 
 _VALID_KINDS = {"reply", "need", "question", "repair", "social"}
 
@@ -64,16 +91,22 @@ def parse_candidates(raw: str) -> list[Candidate]:
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
         text = re.sub(r"\n?```$", "", text).strip()
 
-    if not text.startswith("["):
-        match = re.search(r"\[.*\]", text, re.DOTALL)
-        if not match:
-            return []
-        text = match.group(0)
-
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
-        return []
+        # Fall back to locating a bare array inside surrounding prose.
+        match = re.search(r"\[.*\]", text, re.DOTALL)
+        if not match:
+            return []
+        try:
+            payload = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return []
+
+    if isinstance(payload, dict):
+        # Strict structured outputs cannot return a top-level array, so providers that
+        # constrain decoding wrap it in an object. Unwrap the single list it carries.
+        payload = next((v for v in payload.values() if isinstance(v, list)), None)
     if not isinstance(payload, list):
         return []
 
@@ -153,6 +186,7 @@ def generate_candidates(
         ),
         max_tokens=400,
         temperature=0.5,
+        json_schema=CANDIDATE_SCHEMA,
     )
     try:
         raw = model.complete(prompt)
@@ -188,6 +222,7 @@ def expand_abbreviation(
         ),
         max_tokens=400,
         temperature=0.4,
+        json_schema=CANDIDATE_SCHEMA,
     )
     try:
         raw = model.complete(prompt)

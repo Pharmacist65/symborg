@@ -41,6 +41,13 @@ class Prompt:
     max_tokens: int = 512
     temperature: float = 0.4
     stop: tuple[str, ...] = field(default_factory=tuple)
+    json_schema: dict | None = None
+    """Optional shape the reply should conform to.
+
+    A hint, not a contract: providers that support constrained decoding use it to
+    guarantee well-formed output; the rest ignore it and the caller still parses
+    defensively. Keeping it optional is what lets one prompt serve every provider.
+    """
 
 
 @dataclass(slots=True, frozen=True)

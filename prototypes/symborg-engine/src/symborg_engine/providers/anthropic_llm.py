@@ -21,7 +21,7 @@ class AnthropicLanguageModel:
     """Adapts the Anthropic SDK to the :class:`LanguageModel` protocol."""
 
     def __init__(self, model: str | None = None, api_key: str | None = None,
-                 timeout_s: float = 8.0) -> None:
+                 timeout_s: float = 8.0, max_retries: int = 1) -> None:
         try:
             import anthropic
         except ImportError as exc:  # pragma: no cover - exercised via resolve()
@@ -34,9 +34,14 @@ class AnthropicLanguageModel:
             raise ProviderError("no_api_key")
 
         self._model = model or os.environ.get("SYMBORG_LLM_MODEL", DEFAULT_MODEL)
-        self._client = anthropic.Anthropic(api_key=key, timeout=timeout_s)
+        # Retries are capped deliberately: the worst case is roughly
+        # timeout_s * (max_retries + 1), and this sits on an interactive path.
+        self._client = anthropic.Anthropic(api_key=key, timeout=timeout_s,
+                                           max_retries=max_retries)
 
     def complete(self, prompt: Prompt) -> str:
+        # prompt.json_schema is ignored here: this provider is not asked to constrain
+        # decoding, and the caller parses defensively either way.
         try:
             message = self._client.messages.create(
                 model=self._model,

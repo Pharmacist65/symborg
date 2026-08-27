@@ -166,3 +166,29 @@ class TestTurkishMorphology(unittest.TestCase):
         ]:
             with self.subTest(text=text):
                 self.assertFalse(self._rejected(text))
+
+
+class TestStructuredOutputShapes(unittest.TestCase):
+    """Providers that constrain decoding must wrap the array in an object.
+
+    Both shapes have to parse, or the engine would depend on which vendor answered.
+    """
+
+    def test_object_wrapper_is_unwrapped(self) -> None:
+        out = parse_candidates('{"candidates": [{"text": "Evet.", "kind": "reply", "confidence": 0.8}]}')
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].text, "Evet.")
+
+    def test_bare_array_still_parses(self) -> None:
+        self.assertEqual(len(parse_candidates('[{"text": "Evet."}]')), 1)
+
+    def test_object_without_a_list_yields_nothing(self) -> None:
+        self.assertEqual(parse_candidates('{"error": "nope"}'), [])
+
+    def test_schema_is_offered_to_the_provider(self) -> None:
+        model = _FixedModel("[]")
+        generate_candidates(model, Transcript())
+        schema = model.calls[0].json_schema
+        self.assertIsNotNone(schema)
+        self.assertEqual(schema["type"], "object")
+        self.assertIn("candidates", schema["properties"])

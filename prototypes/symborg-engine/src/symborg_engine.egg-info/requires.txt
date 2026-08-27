@@ -1,0 +1,12 @@
+
+[all]
+symborg-engine[anthropic,asr,openai]
+
+[anthropic]
+anthropic>=0.40
+
+[asr]
+openai-whisper>=20231117
+
+[openai]
+openai>=1.40
