@@ -131,6 +131,35 @@ not *what* — is the layer this project is actually building.
 
 Reproduce with `PYTHONPATH=src python3 bench/latency.py` (costs a few API calls).
 
+## Turn-end prediction
+
+The predictor is built, and it does what the architecture claimed. Measured on the same
+hardware and the same hosted model, playing one Turkish turn as five fragments at
+conversational pace:
+
+| | Lead time | What the person waits |
+|---|---:|---:|
+| Wait for silence (what every system does) | — | **2,166 ms** |
+| Predict the turn end and generate during it | 700 ms | **0 ms** |
+
+The call still took its 1.4 seconds. It happened behind the speaker's last two
+fragments, so nobody waited for it.
+
+Turkish makes this unusually tractable: the language is verb-final and agglutinative, so
+tense, mood and person arrive as suffixes on the last word. Hearing *"gidiyorum"* tells
+you the clause has closed — a signal a speaker of an SVO language does not get. The
+first predictor reads those suffix shapes directly: no model, no network, no latency.
+See `symborg_engine/turntaking/turkish.py`, whose known failure modes are documented in
+the code rather than hidden.
+
+```python
+session = Session()
+for fragment in incoming_speech:
+    if session.hear_partial(fragment).fired:
+        pass                    # generation has already started
+result = session.offer()        # returns immediately; result.speculative is True
+```
+
 ## Status
 
 Research software. Not a medical device. It does not diagnose or treat, and makes no

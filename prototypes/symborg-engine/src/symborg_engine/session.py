@@ -20,6 +20,7 @@ from .providers.base import (
     LanguageModel, Synthesiser, TranscriptChunk, Utterance, VoiceRef,
 )
 from .providers.offline import OfflineSynthesiser
+from .turntaking import TurnMonitor, TurnSignal
 
 __all__ = ["Session", "OfferResult", "SpeakResult"]
 
@@ -35,6 +36,14 @@ class OfferResult:
     offer: Offer
     latency_ms: int
     degraded: bool = False
+    speculative: bool = False
+    """Whether these candidates were generated before the turn actually ended.
+
+    When true, ``latency_ms`` was spent while the other person was still speaking, so
+    the delay the user experiences is roughly zero rather than the value reported."""
+    lead_ms: int = 0
+    """How long before the turn ended that generation started. This is the number the
+    whole design turns on: it is what converts a 1.4-second call into no wait at all."""
 
     @property
     def candidates(self) -> tuple[Candidate, ...]:
@@ -46,7 +55,8 @@ class OfferResult:
 
     def to_dict(self) -> dict:
         return {"offer": self.offer.to_dict(), "latency_ms": self.latency_ms,
-                "degraded": self.degraded}
+                "degraded": self.degraded, "speculative": self.speculative,
+                "lead_ms": self.lead_ms}
 
 
 @dataclass(slots=True, frozen=True)
@@ -81,6 +91,7 @@ class Session:
     vault: Vault = field(default_factory=Vault)
     transcript: Transcript = field(default_factory=Transcript)
     candidate_count: int = 3
+    monitor: TurnMonitor = field(default_factory=TurnMonitor)
     _ledger: AuthorizationLedger = field(
         default_factory=AuthorizationLedger, init=False, repr=False, compare=False,
     )
@@ -88,6 +99,8 @@ class Session:
     _rejections: list[str] = field(
         default_factory=list, init=False, repr=False, compare=False,
     )
+    _speculation: OfferResult | None = field(default=None, init=False, repr=False, compare=False)
+    _spec_started_ms: int = field(default=0, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.model = resolve_language_model(self.model)
@@ -97,8 +110,49 @@ class Session:
     # -- input -----------------------------------------------------------------
 
     def hear(self, text: str, speaker: str = "partner") -> None:
-        """Record something that was said near the person."""
+        """Record a completed utterance near the person.
+
+        Ends the current turn: any speculation still in flight is either used by the
+        next :meth:`offer` or discarded there.
+        """
         self.transcript.add_text(text, speaker=speaker)
+        self.monitor.reset()
+
+    def hear_partial(self, text: str) -> TurnSignal:
+        """Feed a fragment of speech that is still in progress.
+
+        This is the entry point the whole design turns on. Each fragment is scored for
+        how likely it is that the speaker has just finished, and when that crosses the
+        threshold generation starts immediately — while they are still talking — so the
+        candidates are ready the moment the turn actually ends.
+
+        Returns:
+            The signal for this fragment, including whether generation was triggered.
+        """
+        signal = self.monitor.observe(text)
+        if signal.fired:
+            self._speculate(self.monitor.partial)
+        return signal
+
+    def _speculate(self, partial: str) -> None:
+        """Generate against a turn that has not finished yet."""
+        started = _now_ms()
+        self._spec_started_ms = started
+        scratch = Transcript(window_turns=self.transcript.window_turns)
+        for chunk in self.transcript.chunks:
+            scratch.add(chunk)
+        scratch.add_text(partial, speaker="partner")
+
+        candidates = generate_candidates(
+            self.model, scratch, self.vault, n=self.candidate_count,
+        )
+        offer = Offer(candidates=tuple(candidates))
+        self._speculation = OfferResult(
+            offer=offer,
+            latency_ms=max(0, _now_ms() - started),
+            degraded=not candidates,
+            speculative=True,
+        )
 
     def ingest(self, chunk: TranscriptChunk) -> None:
         """Record a chunk from a transcriber."""
@@ -107,11 +161,26 @@ class Session:
     # -- offering --------------------------------------------------------------
 
     def offer(self) -> OfferResult:
-        """Generate and present candidates.
+        """Present candidates for the turn that just ended.
+
+        If speculation fired during the turn and produced something usable, it is
+        served immediately: the work already happened behind the speaker's last words,
+        and the person waits for nothing. Otherwise this falls back to generating now,
+        which is correct but slow enough to be noticed.
 
         An empty offer is a valid outcome: when the engine has nothing useful to say,
         offering nothing is better than offering something wrong.
         """
+        ready = self._speculation
+        self._speculation = None
+        if ready is not None and not ready.is_empty:
+            lead = max(0, _now_ms() - self._spec_started_ms)
+            self._current = ready.offer
+            return OfferResult(
+                offer=ready.offer, latency_ms=ready.latency_ms,
+                degraded=False, speculative=True, lead_ms=lead,
+            )
+
         started = _now_ms()
         candidates = generate_candidates(
             self.model, self.transcript, self.vault, n=self.candidate_count,

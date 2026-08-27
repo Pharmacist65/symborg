@@ -7,7 +7,37 @@ on:
     branches: [main]
 
 jobs:
+  guard:
+    name: no secrets, no private files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Private material must never be tracked
+        run: |
+          if git ls-files | grep -E '^_private/|^\.env'; then
+            echo "::error::Private files are tracked. Remove them from the index."
+            exit 1
+          fi
+
+      - name: No credentials in tracked files
+        run: |
+          if git ls-files -z | xargs -0 grep -lIE \
+              'sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|Bearer [A-Za-z0-9_-]{30,}'; then
+            echo "::error::A credential appears in a tracked file."
+            exit 1
+          fi
+
+      - name: No credentials anywhere in history
+        run: |
+          if git log --all -p | grep -qE 'sk-[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}'; then
+            echo "::error::A credential appears in git history. Rotate the key, then rewrite history."
+            exit 1
+          fi
+
   test:
+    needs: guard
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
