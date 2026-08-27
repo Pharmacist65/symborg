@@ -191,8 +191,20 @@ detection. The models that do accept turn detection returned nothing until the b
 was committed — which would remove the only thing that makes anticipation possible. So
 turn boundaries are decided here instead, which is where they belong.
 
-Verified end to end against synthesised Turkish speech: one turn, transcribed whole,
-candidates already waiting when it ended.
+Verified end to end against a real microphone: two turns, gate committing mid-sentence,
+median lead 3,543 ms, candidates waiting when each turn ended.
+
+That run also exposed the real cost of committing early, which was not what had been
+assumed. The gate fired on *"Ağrın var"* and the speaker continued *"…mı? Doktoru
+çağırmamı ister misin?"* — so the candidates answered a question that was never asked.
+An early fire does not cost a wasted API call. It costs **a wrong sentence, offered to
+someone who cannot easily correct it**, which is much worse and worth a second call to
+avoid.
+
+So speculation is now refreshed when the turn materially outgrows it (`stale_after_words`,
+default 3). Small continuations are ignored, because regenerating on every word would
+make the options flicker while the person is trying to read them. With the refresh in
+place the same audio produces candidates that answer both halves of the question.
 
 **What that API does not supply is anticipation, and this is the reason the predictor
 still exists.** Every turn-boundary event it emits fires after silence has been

@@ -101,6 +101,17 @@ class Session:
     )
     _speculation: OfferResult | None = field(default=None, init=False, repr=False, compare=False)
     _spec_started_ms: int = field(default=0, init=False, repr=False, compare=False)
+    _spec_partial: str = field(default="", init=False, repr=False, compare=False)
+    stale_after_words: int = 3
+    """How much the turn may grow after speculation before it is discarded.
+
+    Measured against real speech: the gate committed on "Ağrın var" and the speaker
+    continued "…mı? Doktoru çağırmamı ister misin?", so candidates were generated
+    against two words and answered a question that was never asked.
+
+    The cost of an early fire is therefore not a wasted call, as first assumed. It is a
+    wrong sentence offered to someone who cannot easily correct it — which is far worse,
+    and worth a second call to avoid."""
 
     def __post_init__(self) -> None:
         self.model = resolve_language_model(self.model)
@@ -112,11 +123,17 @@ class Session:
     def hear(self, text: str, speaker: str = "partner") -> None:
         """Record a completed utterance near the person.
 
-        Ends the current turn: any speculation still in flight is either used by the
-        next :meth:`offer` or discarded there.
+        Ends the current turn and clears any speculation held for it. Callers that want
+        to use speculation must call :meth:`offer` first — which is what
+        :func:`~symborg_engine.stream.drive` does.
         """
         self.transcript.add_text(text, speaker=speaker)
         self.monitor.reset()
+        # The turn is over. Anything speculated for it must not leak into the next one,
+        # where it would answer a question nobody asked.
+        self._speculation = None
+        self._spec_partial = ""
+        self._spec_started_ms = 0
 
     def hear_partial(self, text: str, cumulative: bool = False) -> TurnSignal:
         """Feed a fragment of speech that is still in progress.
@@ -132,12 +149,27 @@ class Session:
         signal = self.monitor.observe(text, cumulative=cumulative)
         if signal.fired:
             self._speculate(self.monitor.partial)
+        elif self._is_stale(self.monitor.partial):
+            # The speaker kept going and said something materially different from what
+            # was generated against. Regenerate rather than offer a stale answer.
+            self._speculate(self.monitor.partial)
         return signal
+
+    def _is_stale(self, partial: str) -> bool:
+        """Whether the turn has outgrown the speculation already in hand."""
+        if self._speculation is None or not self._spec_partial:
+            return False
+        grown = len(partial.split()) - len(self._spec_partial.split())
+        return grown >= self.stale_after_words
 
     def _speculate(self, partial: str) -> None:
         """Generate against a turn that has not finished yet."""
         started = _now_ms()
-        self._spec_started_ms = started
+        if self._spec_started_ms == 0:
+            # Keep the original commit time: the lead is measured from when the system
+            # first decided to act, not from the most recent refresh.
+            self._spec_started_ms = started
+        self._spec_partial = partial
         scratch = Transcript(window_turns=self.transcript.window_turns)
         for chunk in self.transcript.chunks:
             scratch.add(chunk)
@@ -173,6 +205,7 @@ class Session:
         """
         ready = self._speculation
         self._speculation = None
+        self._spec_partial = ""
         if ready is not None and not ready.is_empty:
             lead = max(0, _now_ms() - self._spec_started_ms)
             self._current = ready.offer
@@ -232,6 +265,9 @@ class Session:
         if self._current is not None:
             self._current.consumed = True
         self._current = None
+        self._speculation = None
+        self._spec_partial = ""
+        self._spec_started_ms = 0
 
     # -- output ----------------------------------------------------------------
 

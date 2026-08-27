@@ -306,3 +306,62 @@ class TestCumulativeFragments(unittest.TestCase):
         turns = drive(Session(model=_Model()), _Stream())
         self.assertEqual(len(turns), 1)
         self.assertEqual(len(turns[0].result.candidates), 3)
+
+
+class TestStaleSpeculation(unittest.TestCase):
+    """Firing early costs context, and the cost is a wrong sentence.
+
+    Measured against real speech: the gate committed on "Ağrın var" and the speaker
+    continued "…mı? Doktoru çağırmamı ister misin?". The candidates answered a question
+    that was never asked. These pin the refresh that prevents it.
+    """
+
+    def test_speculation_refreshes_when_the_turn_grows(self) -> None:
+        model = _Model()
+        session = Session(model=model)
+        session.hear_partial("Ağrın var mı", cumulative=True)
+        self.assertEqual(len(model.calls), 1)
+
+        session.hear_partial("Ağrın var mı Doktoru çağırmamı ister misin", cumulative=True)
+        self.assertEqual(len(model.calls), 2, "the turn grew; regenerate")
+
+    def test_the_refreshed_generation_sees_the_whole_turn(self) -> None:
+        model = _Model()
+        session = Session(model=model)
+        session.hear_partial("Ağrın var mı", cumulative=True)
+        session.hear_partial("Ağrın var mı Doktoru çağırmamı ister misin", cumulative=True)
+        self.assertIn("Doktoru çağırmamı", model.calls[-1].user)
+
+    def test_a_small_continuation_does_not_regenerate(self) -> None:
+        """Refreshing on every word would make the options flicker while being read."""
+        model = _Model()
+        session = Session(model=model)
+        session.hear_partial("Ağrın var mı", cumulative=True)
+        session.hear_partial("Ağrın var mı acaba", cumulative=True)
+        self.assertEqual(len(model.calls), 1)
+
+    def test_the_offer_uses_the_latest_generation(self) -> None:
+        model = _Model()
+        session = Session(model=model)
+        session.hear_partial("Ağrın var mı", cumulative=True)
+        session.hear_partial("Ağrın var mı Doktoru çağırmamı ister misin", cumulative=True)
+        result = session.offer()
+        self.assertTrue(result.speculative)
+        self.assertEqual(len(model.calls), 2, "the offer must not generate a third time")
+
+    def test_lead_is_measured_from_the_first_commit(self) -> None:
+        """A refresh is not a new decision — the system committed at the first one."""
+        model = _Model()
+        session = Session(model=model)
+        session.hear_partial("Ağrın var mı", cumulative=True)
+        first = session._spec_started_ms
+        session.hear_partial("Ağrın var mı Doktoru çağırmamı ister misin", cumulative=True)
+        self.assertEqual(session._spec_started_ms, first)
+
+    def test_a_new_turn_clears_stale_state(self) -> None:
+        model = _Model()
+        session = Session(model=model)
+        session.hear_partial("Ağrın var mı", cumulative=True)
+        session.hear("Ağrın var mı")
+        self.assertEqual(session._spec_partial, "")
+        self.assertEqual(session._spec_started_ms, 0)
