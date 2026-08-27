@@ -93,3 +93,49 @@ class TestCoreStaysDependencyFree(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTrustStoreRepair(unittest.TestCase):
+    """The python.org macOS installers ship without root certificates.
+
+    That gap makes every TLS connection fail in a way that looks like a bug in
+    whatever opened the socket, so the repair is targeted and must stay so.
+    """
+
+    def test_repair_finds_a_store(self) -> None:
+        from symborg_engine.tls import ensure_trust_store
+        self.assertIsNotNone(ensure_trust_store())
+
+    def test_an_existing_store_is_not_overridden(self) -> None:
+        """Repair must never replace a trust store the operator configured."""
+        import os
+        from symborg_engine.tls import ensure_trust_store
+
+        marker = __file__            # any path that exists
+        previous = os.environ.get("SSL_CERT_FILE")
+        os.environ["SSL_CERT_FILE"] = marker
+        try:
+            self.assertEqual(ensure_trust_store(), marker)
+            self.assertEqual(os.environ["SSL_CERT_FILE"], marker)
+        finally:
+            if previous is None:
+                os.environ.pop("SSL_CERT_FILE", None)
+            else:
+                os.environ["SSL_CERT_FILE"] = previous
+
+    def test_verification_is_never_disabled(self) -> None:
+        """A trust-store gap must not become a reason to stop checking certificates."""
+        source = (SRC / "tls.py").read_text(encoding="utf-8")
+        for forbidden in ("CERT_NONE", "check_hostname = False", "verify=False",
+                          "_create_unverified_context"):
+            self.assertNotIn(forbidden, source)
+
+    def test_repair_actually_enables_tls(self) -> None:
+        import ssl
+        from symborg_engine.tls import ensure_trust_store
+
+        store = ensure_trust_store()
+        self.assertIsNotNone(store)
+        context = ssl.create_default_context(cafile=store if store.endswith(".pem") else None)
+        self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(context.check_hostname)

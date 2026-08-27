@@ -24,7 +24,7 @@ dependencies = []
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=3.0"]
-realtime = ["openai[realtime,voice-helpers]>=3.0", "sounddevice>=0.4"]
+realtime = ["openai[realtime,voice-helpers]>=3.0", "sounddevice>=0.4", "certifi"]
 asr = ["openai-whisper>=20231117"]
 all = ["symborg-engine[anthropic,openai,realtime,asr]"]
 

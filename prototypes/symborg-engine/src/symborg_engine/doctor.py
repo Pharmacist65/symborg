@@ -12,6 +12,7 @@ import sys
 import warnings
 
 from .providers import _KEYS, _ORDER, available_providers, resolve_language_model
+from .tls import trust_store_status
 
 __all__ = ["report", "main"]
 
@@ -27,6 +28,8 @@ def report() -> int:
 
     lines.append("Python")
     lines.append(f"  [{_OK}] {sys.version.split()[0]}")
+    status = trust_store_status()
+    lines.append(f"  [{_OK if status.startswith('ok') else _WARN}] TLS trust store: {status}")
     lines.append("")
 
     lines.append("Optional SDKs")

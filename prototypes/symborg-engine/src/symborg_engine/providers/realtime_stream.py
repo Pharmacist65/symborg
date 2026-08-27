@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from typing import Iterator
 
 from ..stream import Fragment
+from ..tls import ensure_trust_store
 
 __all__ = ["RealtimeTranscriptStream", "MicrophoneSource", "TRANSCRIBE_MODEL"]
 
@@ -136,6 +137,9 @@ class RealtimeTranscriptStream:
             self._out.put(_SENTINEL)
 
     async def _listen(self) -> None:
+        # The WebSocket builds its own SSL context, so it inherits the platform's
+        # missing trust store where the SDK's HTTP client would not have.
+        ensure_trust_store()
         try:
             from openai import AsyncOpenAI
         except ImportError as exc:  # pragma: no cover - optional extra
