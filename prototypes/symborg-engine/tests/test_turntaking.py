@@ -202,3 +202,59 @@ class TestHardTurkishCases(unittest.TestCase):
         """Treating 'ne' as correlative suppressed genuine question endings; measured,
         that cost more than it saved."""
         self.assertGreaterEqual(completion_score("Ne zaman geleceksin"), 0.6)
+
+
+class TestStreamDriving(unittest.TestCase):
+    """The engine must not care where fragments come from."""
+
+    def test_a_turn_produces_one_result(self) -> None:
+        from symborg_engine import TextStream, drive
+
+        session = Session(model=_Model())
+        turns = drive(session, TextStream(["Yani ben de", "ağrın var mı"]))
+        self.assertEqual(len(turns), 1)
+        self.assertEqual(len(turns[0].result.candidates), 3)
+
+    def test_lead_time_is_reported(self) -> None:
+        from symborg_engine import Fragment, drive
+
+        class _Timed:
+            def __iter__(self):
+                yield Fragment("Yani ben de", at_ms=0)
+                yield Fragment("bilmiyorum ama", at_ms=400)
+                yield Fragment("ağrın var mı", is_final=True, at_ms=800)
+
+        turns = drive(Session(model=_Model()), _Timed())
+        self.assertTrue(turns[0].anticipated)
+        self.assertEqual(turns[0].lead_ms, 0, "fired on the final fragment here")
+
+    def test_anticipation_shows_up_as_lead(self) -> None:
+        from symborg_engine import Fragment, drive
+
+        class _Timed:
+            def __iter__(self):
+                yield Fragment("Ağrın var mı", at_ms=0)          # fires here
+                yield Fragment("söyler misin", at_ms=400)
+                yield Fragment("merak ediyorum", is_final=True, at_ms=800)
+
+        turns = drive(Session(model=_Model()), _Timed())
+        self.assertTrue(turns[0].anticipated)
+        self.assertEqual(turns[0].lead_ms, 800)
+
+    def test_multiple_turns_each_reset_the_monitor(self) -> None:
+        from symborg_engine import Fragment, drive
+
+        class _Two:
+            def __iter__(self):
+                yield Fragment("Ağrın var mı", is_final=True, at_ms=0)
+                yield Fragment("Doktoru çağırayım mı", is_final=True, at_ms=0)
+
+        turns = drive(Session(model=_Model()), _Two())
+        self.assertEqual(len(turns), 2)
+        self.assertTrue(all(t.anticipated for t in turns))
+
+    def test_blank_fragments_are_ignored(self) -> None:
+        from symborg_engine import TextStream, drive
+
+        turns = drive(Session(model=_Model()), TextStream(["", "   ", "Ağrın var mı"]))
+        self.assertEqual(len(turns), 1)

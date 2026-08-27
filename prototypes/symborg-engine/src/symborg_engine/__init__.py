@@ -30,11 +30,15 @@ from .providers.base import (
     TranscriptChunk, Utterance, VoiceRef,
 )
 from .session import OfferResult, Session, SpeakResult
+from .stream import Fragment, TextStream, TranscriptStream, TurnResult, drive
+from .turntaking import TurnMonitor, TurnSignal, completion_score
 
 __version__ = "0.1.0"
 
 __all__ = [
     "Session", "OfferResult", "SpeakResult",
+    "drive", "Fragment", "TextStream", "TranscriptStream", "TurnResult",
+    "TurnMonitor", "TurnSignal", "completion_score",
     "Candidate", "Offer",
     "SpeechAuthorization", "AuthorizationError", "AuthorizationLedger",
     "Transcript", "Vault",
