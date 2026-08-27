@@ -100,6 +100,7 @@ def drive(
     session: Session,
     stream: TranscriptStream,
     on_turn: Callable[[TurnResult], None] | None = None,
+    on_fragment: Callable[[Fragment, bool], None] | None = None,
 ) -> list[TurnResult]:
     """Feed a session from a stream, one turn at a time.
 
@@ -111,6 +112,9 @@ def drive(
         session: The session to drive.
         stream: Where fragments come from.
         on_turn: Called as each turn completes, for live display.
+        on_fragment: Called for every fragment with whether it triggered the gate.
+            Without this a caller sees nothing until a turn ends, which makes a
+            working system indistinguishable from a dead one.
 
     Returns:
         One :class:`TurnResult` per completed turn.
@@ -128,6 +132,8 @@ def drive(
             signal = session.hear_partial(fragment.text, cumulative=fragment.cumulative)
             if signal.fired and fired_at is None:
                 fired_at = fragment.at_ms
+            if on_fragment is not None:
+                on_fragment(fragment, signal.fired)
 
         if fragment.is_final:
             partial = session.monitor.partial
