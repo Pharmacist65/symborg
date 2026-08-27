@@ -39,9 +39,29 @@ FINITE_ENDINGS: tuple[str, ...] = (
     "arım", "erim", "ırım", "irim", "urum", "ürüm",
     "sın", "sin", "sun", "sün",
     "dır", "dir", "dur", "dür", "tır", "tir", "tur", "tür",
+    # negative copula, which inflects for person and so does not end in a verb suffix
+    "değilim", "değilsin", "değiliz", "değilsiniz", "değiller", "değildi",
     # copular and existential closers
     "değil", "var", "yok", "evet", "hayır", "tamam", "peki",
 )
+
+_HEDGES = frozenset({
+    # Verb forms that in practice open a turn rather than close one. "Sanırım" is a
+    # first-person aorist and looks finite, but a speaker who has said only that word
+    # is hedging what comes next, not finishing.
+    "sanırım", "galiba", "herhalde", "bence", "sanki", "belki",
+})
+
+_CORRELATIVE_OPENERS = frozenset({
+    # These promise a second half: "Hem ... hem de ...", "Ya ... ya da ...". A clause
+    # can close grammatically while the turn is still incomplete.
+    #
+    # "ne ... ne de" belongs here grammatically but is deliberately excluded: "ne" is
+    # far more often interrogative ("ne zaman geleceksin"), and treating it as a
+    # correlative suppressed genuine question endings. Measured, that cost more than
+    # it saved.
+    "hem", "ya",
+})
 
 CONTINUERS: tuple[str, ...] = (
     # conjunctions and subordinators: a clause boundary, but the turn keeps going
@@ -53,6 +73,24 @@ CONTINUERS: tuple[str, ...] = (
 )
 
 _FILLER = ("şey", "hani", "işte", "falan", "filan", "ıı", "ee", "mmm")
+
+_PREDICATE_WORDS = frozenset({
+    # Turkish predicates need no verb: "Hava güzel." carries no suffix to read, so
+    # morphology alone cannot see the clause close. These are the words that most often
+    # occupy that final predicate slot in the health and everyday register this product
+    # lives in. A learned model would not need the list; a suffix reader does.
+    "güzel", "kötü", "iyi", "fena", "pahalı", "ucuz", "zor", "kolay",
+    "fazla", "az", "çok", "hazır", "dolu", "boş", "aç", "tok", "yorgun",
+    "hasta", "sağlam", "mümkün", "gerekli", "yeter", "yeterli", "doğru", "yanlış",
+})
+
+_IMPERATIVE_STEMS = frozenset({
+    # Bare stems: a Turkish imperative carries no suffix at all, so it looks like a
+    # fragment to a suffix reader while being a complete directive.
+    "ara", "bekle", "gel", "git", "söyle", "bak", "dur", "otur", "kalk",
+    "getir", "ver", "al", "gör", "dinle", "anlat", "yaz", "aç", "kapat",
+    "başla", "bırak", "yardım",
+})
 
 _NOT_VERBS = frozenset({
     # Frequent words whose ending merely looks like a finite suffix. Suffix shape alone
@@ -118,10 +156,31 @@ def completion_score(partial: str) -> float:
     if _ends_with_converb(last):
         return 0.15        # converb: grammatically unfinished
 
+    first = words[0]
+
+    # A lone hedge is the start of a thought, not the end of one.
+    if len(words) == 1 and last in _HEDGES:
+        return 0.1
+
+    # A correlative promises a second half, so the first clause closing does not close
+    # the turn — but only until that second half actually arrives.
+    if first in _CORRELATIVE_OPENERS and words.count(first) < 2:
+        return 0.2
+
     score = 0.2
-    if last in _NOT_VERBS:
+
+    # A short bare imperative is a complete turn even though it carries no suffix.
+    if last in _IMPERATIVE_STEMS and len(words) <= 3:
+        score = 0.7
+
+    # Verbless predicate: "Hava çok güzel." Weaker evidence than a finite verb, since
+    # the same word can sit mid-clause, so it needs a clause long enough to be credible.
+    elif last in _PREDICATE_WORDS and len(words) >= 3:
+        score = 0.68
+
+    elif last in _NOT_VERBS:
         return score
-    if any(last.endswith(e) for e in FINITE_ENDINGS):
+    elif any(last.endswith(e) for e in FINITE_ENDINGS):
         score = 0.75       # finite verb form — the clause closed
         if len(words) >= 4:
             score += 0.1   # a longer clause makes an incidental match less likely

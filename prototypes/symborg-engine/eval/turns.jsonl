@@ -1,0 +1,36 @@
+{"fragments": ["Doktora gidiyorum"], "end_at": 0, "tag": "yüklem-sonlu"}
+{"fragments": ["Bugün hastaneye", "gittim"], "end_at": 1, "tag": "yüklem-sonlu"}
+{"fragments": ["Yarın sabah", "gelecek"], "end_at": 1, "tag": "yüklem-sonlu"}
+{"fragments": ["O ilacı", "kullanmadım"], "end_at": 1, "tag": "olumsuz-yüklem"}
+{"fragments": ["Sanırım", "iyileşiyorum"], "end_at": 1, "tag": "yüklem-sonlu"}
+{"fragments": ["Ağrın", "var mı"], "end_at": 1, "tag": "soru-eki"}
+{"fragments": ["Doktoru", "çağırayım mı"], "end_at": 1, "tag": "soru-eki"}
+{"fragments": ["Bugün nasılsın"], "end_at": 0, "tag": "soru"}
+{"fragments": ["Ne zaman", "geleceksin"], "end_at": 1, "tag": "soru"}
+{"fragments": ["Gidiyorum ama", "önce yemek yiyeceğim"], "end_at": 1, "tag": "bağlaç-devam"}
+{"fragments": ["İyiyim çünkü", "ilaçlar işe yaradı"], "end_at": 1, "tag": "bağlaç-devam"}
+{"fragments": ["Hem ağrım var", "hem de uyuyamıyorum"], "end_at": 1, "tag": "bağlaç-devam"}
+{"fragments": ["Eve gidip", "biraz dinleneceğim"], "end_at": 1, "tag": "ulaç-devam"}
+{"fragments": ["Koşarak", "geldim"], "end_at": 1, "tag": "ulaç-devam"}
+{"fragments": ["Doktoru görünce", "sorarım"], "end_at": 1, "tag": "ulaç-devam"}
+{"fragments": ["Yani ben de", "bilmiyorum artık,", "doktor değiştirsek mi"], "end_at": 2, "tag": "virgül-tuzağı"}
+{"fragments": ["Şey,", "nasıl desem,", "biraz zorlanıyorum"], "end_at": 2, "tag": "virgül-tuzağı"}
+{"fragments": ["Sanırım artık", "vazgeçtim"], "end_at": 1, "tag": "sahte-yüklem"}
+{"fragments": ["Onun kadar", "iyi değilim"], "end_at": 1, "tag": "sahte-yüklem"}
+{"fragments": ["Bundan başka", "bir şey istemiyorum"], "end_at": 1, "tag": "sahte-yüklem"}
+{"fragments": ["Şey hani", "dün konuştuğumuz konu"], "end_at": 1, "tag": "dolgu"}
+{"fragments": ["Ee işte", "öyle oldu"], "end_at": 1, "tag": "dolgu"}
+{"fragments": ["Bugün hava çok güzel"], "end_at": 0, "tag": "ad-cümlesi"}
+{"fragments": ["Ağrım çok fazla"], "end_at": 0, "tag": "ad-cümlesi"}
+{"fragments": ["Bu ilaç", "çok pahalı"], "end_at": 1, "tag": "ad-cümlesi"}
+{"fragments": ["Su", "var"], "end_at": 1, "tag": "varlık"}
+{"fragments": ["Hiç iştahım", "yok"], "end_at": 1, "tag": "varlık"}
+{"fragments": ["Evet"], "end_at": 0, "tag": "kısa"}
+{"fragments": ["Hayır"], "end_at": 0, "tag": "kısa"}
+{"fragments": ["Tamam"], "end_at": 0, "tag": "kısa"}
+{"fragments": ["Dün akşam", "yemekten sonra", "biraz kötüleştim ama", "sabaha iyiydim"], "end_at": 3, "tag": "uzun"}
+{"fragments": ["Doktor bana", "dinlenmemi söyledi ve", "ilaçları düzenli almamı", "istedi"], "end_at": 3, "tag": "uzun"}
+{"fragments": ["Gittiğimde", "kimse yoktu"], "end_at": 1, "tag": "yan-cümle"}
+{"fragments": ["Eğer ağrı geçmezse", "seni ararım"], "end_at": 1, "tag": "koşul"}
+{"fragments": ["Doktoru ara"], "end_at": 0, "tag": "emir"}
+{"fragments": ["Lütfen biraz", "bekle"], "end_at": 1, "tag": "emir"}

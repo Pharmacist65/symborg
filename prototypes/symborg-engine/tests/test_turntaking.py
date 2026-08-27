@@ -158,3 +158,47 @@ class TestSpeculativeGeneration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHardTurkishCases(unittest.TestCase):
+    """Grammar facts a suffix reader gets wrong until told.
+
+    Each of these was a measured failure on eval/turns.jsonl before it was handled.
+    """
+
+    def test_verbless_predicate_closes_a_clause(self) -> None:
+        """Turkish predicates need no verb: 'Hava güzel.' has nothing to read."""
+        for text in ["Bugün hava çok güzel", "Ağrım çok fazla", "Bu ilaç çok pahalı"]:
+            with self.subTest(text=text):
+                self.assertGreaterEqual(completion_score(text), 0.6)
+
+    def test_predicate_word_mid_clause_does_not_fire(self) -> None:
+        """The same word sits mid-clause, so the rule needs clause length."""
+        self.assertLess(completion_score("Çok"), 0.6)
+
+    def test_bare_imperative_is_a_complete_turn(self) -> None:
+        """An imperative carries no suffix at all, yet the turn is finished."""
+        for text in ["Doktoru ara", "Lütfen biraz bekle", "Gel"]:
+            with self.subTest(text=text):
+                self.assertGreaterEqual(completion_score(text), 0.6)
+
+    def test_negative_copula_inflects_for_person(self) -> None:
+        """'değilim' is not 'değil' plus a verb suffix; it needs listing."""
+        for text in ["Onun kadar iyi değilim", "Hasta değilsin"]:
+            with self.subTest(text=text):
+                self.assertGreaterEqual(completion_score(text), 0.6)
+
+    def test_lone_hedge_opens_a_thought(self) -> None:
+        """'Sanırım' is a finite verb form but a speaker who has said only that is
+        hedging what comes next."""
+        self.assertLess(completion_score("Sanırım"), 0.3)
+        self.assertGreaterEqual(completion_score("Sanırım iyileşiyorum"), 0.6)
+
+    def test_correlative_waits_for_its_second_half(self) -> None:
+        self.assertLess(completion_score("Hem ağrım var"), 0.4)
+        self.assertGreaterEqual(completion_score("Hem ağrım var hem de uyuyamıyorum"), 0.6)
+
+    def test_interrogative_ne_is_not_a_correlative(self) -> None:
+        """Treating 'ne' as correlative suppressed genuine question endings; measured,
+        that cost more than it saved."""
+        self.assertGreaterEqual(completion_score("Ne zaman geleceksin"), 0.6)

@@ -160,6 +160,39 @@ for fragment in incoming_speech:
 result = session.offer()        # returns immediately; result.speculative is True
 ```
 
+### How good is the predictor
+
+`eval/turn_end.py` scores it on the two errors that cost something, which are not
+symmetric: a **miss** loses the turn to full latency, while an **early fire** wastes one
+API call. The threshold sits where that asymmetry puts it, not at balanced accuracy.
+
+On the 36-turn development set, after handling the failure classes it exposed:
+
+| | On time | Early | Missed |
+|---|---:|---:|---:|
+| Wait for silence | 0% | 0% | **100%** |
+| Turkish morphology | **97%** | 0% | 3% |
+
+**That 97% is not a performance claim, and it must not be quoted as one.** The set is
+hand-authored, and the predictor was tuned against it until the number stopped moving.
+It is a regression harness: it catches breakage and documents known failure classes.
+Real evaluation needs recorded two-party Turkish conversation with timing, which is
+separate work.
+
+What the loop was actually worth is the failure classes it surfaced, each a real
+property of the language rather than a quirk of the data:
+
+- **Verbless predicates.** `Bugün hava çok güzel` — Turkish needs no verb, so there is
+  no suffix to read. The largest structural gap, and the clearest argument for a
+  learned model over a suffix reader.
+- **Bare imperatives.** `Doktoru ara` carries no suffix at all and is still complete.
+- **Inflected negative copula.** `değilim` is not `değil` plus a verb ending.
+- **Hedges that look finite.** `Sanırım` is a first-person aorist, but a speaker who
+  has said only that word is opening a thought, not closing one.
+- **Correlatives.** `Hem … hem de …` closes a clause while the turn continues.
+- **A correction the measurement forced.** Treating `ne` as a correlative suppressed
+  genuine question endings; it cost more than it saved and was removed.
+
 ## Status
 
 Research software. Not a medical device. It does not diagnose or treat, and makes no
