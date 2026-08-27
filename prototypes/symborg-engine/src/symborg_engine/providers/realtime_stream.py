@@ -48,6 +48,7 @@ class MicrophoneSource:
 
     device: int | str | None = None
     _queue: queue.Queue = field(default_factory=queue.Queue, init=False, repr=False)
+    _stream: object | None = field(default=None, init=False, repr=False)
 
     def __enter__(self):
         try:
@@ -69,10 +70,10 @@ class MicrophoneSource:
         return self
 
     def __exit__(self, *exc) -> None:
-        stream = getattr(self, "_stream", None)
-        if stream is not None:
-            stream.stop()
-            stream.close()
+        if self._stream is not None:
+            self._stream.stop()
+            self._stream.close()
+            self._stream = None
         self._queue.put(_SENTINEL)
 
     def blocks(self) -> Iterator[bytes]:
