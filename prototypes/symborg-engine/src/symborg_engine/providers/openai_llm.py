@@ -17,11 +17,13 @@ from .base import Prompt, ProviderError
 
 __all__ = ["OpenAILanguageModel", "DEFAULT_MODEL"]
 
-DEFAULT_MODEL = "gpt-5.6-luna"
-"""The cost-and-latency tier of the current family. Candidate generation is a short,
-structured, latency-sensitive task, and here latency is something the user feels: a
-correct sentence arriving after the conversation has moved on has failed. Override with
-SYMBORG_LLM_MODEL."""
+DEFAULT_MODEL = "gpt-5.4-nano"
+"""Chosen by measurement, not by tier name — see ``bench/latency.py``.
+
+Candidate generation is short, structured and latency-sensitive, and here latency is
+something the user feels: a correct sentence arriving after the conversation has moved
+on has failed. Measured on this task, nano is the fastest option at standard price and
+its candidate quality holds. Override with SYMBORG_LLM_MODEL."""
 
 _MIN_OUTPUT_TOKENS = 16
 """The API's documented minimum for max_output_tokens; a smaller value is rejected."""

@@ -184,7 +184,7 @@ def generate_candidates(
             vault.render() if vault else "",
             n,
         ),
-        max_tokens=400,
+        max_tokens=160,
         temperature=0.5,
         json_schema=CANDIDATE_SCHEMA,
     )
@@ -220,7 +220,7 @@ def expand_abbreviation(
             vault.render() if vault else "",
             n,
         ),
-        max_tokens=400,
+        max_tokens=160,
         temperature=0.4,
         json_schema=CANDIDATE_SCHEMA,
     )

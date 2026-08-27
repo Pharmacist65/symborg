@@ -105,9 +105,31 @@ it never fails, and it never quietly sends data anywhere.
 ## Latency
 
 `OfferResult.latency_ms` and `SpeakResult.latency_ms` are part of the API because
-latency is a clinical property here, not an implementation detail. Natural conversation
+latency is a product property here, not an implementation detail. Natural conversation
 leaves roughly 200 ms between turns; a correct sentence that arrives after the
 conversation has moved on has failed.
+
+Measured, generating three Turkish candidates against a hosted model:
+
+| Configuration | Median |
+|---|---:|
+| Budget (delay starts being noticed) | 500 ms |
+| Fastest measured configuration | ~1,180 ms |
+| Current defaults | ~1,370 ms |
+| Larger token budget, larger model, or a slower tier | 1,800–2,900 ms |
+
+Every configuration converges near the same floor. Model choice, token budget,
+constrained decoding and the faster service tier move it by a few hundred
+milliseconds each — none of them reach the budget, and the fastest possible hosted
+call is still more than twice too slow.
+
+**The conclusion is architectural, and it is why this project exists.** You do not
+close this gap by answering faster. You close it by starting earlier: predicting when
+the other person is about to finish and generating during their last words, so the
+candidates are already waiting when the turn arrives. That predictor — deciding *when*,
+not *what* — is the layer this project is actually building.
+
+Reproduce with `PYTHONPATH=src python3 bench/latency.py` (costs a few API calls).
 
 ## Status
 
