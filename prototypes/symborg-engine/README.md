@@ -102,6 +102,35 @@ The same code path runs against any of them; swapping providers touches no engin
 logic. With no key set the engine falls back to the offline provider with a warning —
 it never fails, and it never quietly sends data anywhere.
 
+## The interface
+
+Until now candidates were selected by typing an index into Python, which is adequate
+for a pipeline and useless for the person the pipeline exists for.
+
+```bash
+PYTHONPATH=src python3 -m symborg_engine.ui.server
+```
+
+Then open `http://127.0.0.1:8770`. It listens, shows what it heard, and presents the
+candidates large and high-contrast. Selection works three ways, because a person may
+have very little movement available:
+
+| Input | |
+|---|---|
+| Click or tap | direct |
+| <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> | direct |
+| <kbd>space</kbd> then <kbd>enter</kbd> | **single-switch scanning** — space moves the highlight, enter commits |
+
+The last row is the one that matters: most access switches emulate exactly those two
+keys, so a person with one reliable movement can drive the whole thing.
+
+Standard library only — no framework, no build step, and it binds to localhost.
+
+**The authorship lock holds across the network boundary too**, which is where an
+invariant most easily stops holding. Selecting an index that was never offered returns
+409, and a selection cannot be replayed. `tests/test_ui.py` checks that from outside the
+process rather than trusting it from within.
+
 ## Latency
 
 `OfferResult.latency_ms` and `SpeakResult.latency_ms` are part of the API because

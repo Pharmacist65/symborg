@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SYMBORG</title>
+<style>
+  :root{
+    --bg:#0B1615; --card:#132725; --line:#23423E; --ink:#F0EDE3;
+    --dim:#8CA5A0; --gold:#E3B45C; --teal:#5FC0B2;
+    --focus:#E3B45C;
+  }
+  @media (prefers-color-scheme:light){
+    :root{ --bg:#FAF8F3; --card:#FFFFFF; --line:#DFDCD1; --ink:#12211F;
+           --dim:#5F736F; --gold:#9C6E18; --teal:#1C6F66; }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex;flex-direction:column;overflow:hidden}
+
+  header{padding:18px 26px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:18px;flex:none}
+  .dot{width:11px;height:11px;border-radius:50%;background:var(--dim);flex:none}
+  .dot.on{background:var(--teal);box-shadow:0 0 0 6px color-mix(in srgb,var(--teal) 22%,transparent)}
+  .heard{font-size:1.35rem;color:var(--dim);flex:1;min-width:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .heard b{color:var(--ink);font-weight:500}
+
+  main{flex:1;display:flex;flex-direction:column;justify-content:center;
+    gap:18px;padding:26px;min-height:0}
+
+  .opt{display:flex;align-items:center;gap:24px;width:100%;
+    background:var(--card);border:3px solid var(--line);border-radius:18px;
+    padding:30px 34px;font:inherit;color:var(--ink);text-align:left;cursor:pointer;
+    font-size:clamp(1.5rem,3.6vw,2.4rem);line-height:1.28;
+    transition:border-color .12s, transform .12s}
+  .opt:hover{border-color:var(--dim)}
+  .opt .n{font-size:1.05rem;color:var(--dim);font-variant-numeric:tabular-nums;flex:none;
+    width:2ch;text-align:center}
+  .opt[data-scan="1"]{border-color:var(--focus);transform:scale(1.015)}
+  .opt:focus-visible{outline:4px solid var(--focus);outline-offset:3px}
+  .opt.repair{font-size:clamp(1.2rem,2.6vw,1.7rem);color:var(--dim)}
+
+  .waiting{display:flex;flex-direction:column;align-items:center;gap:16px;
+    color:var(--dim);font-size:1.5rem;text-align:center}
+  .bars{display:flex;gap:5px;align-items:flex-end;height:34px}
+  .bars i{width:6px;background:var(--teal);border-radius:3px;height:6px;
+    transition:height .1s}
+
+  .spoken{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);padding:40px;text-align:center;
+    font-size:clamp(1.9rem,5vw,3.4rem);line-height:1.25;color:var(--ink);
+    opacity:0;pointer-events:none;transition:opacity .18s}
+  .spoken.show{opacity:1}
+  .spoken em{display:block;font-size:.9rem;font-style:normal;color:var(--gold);
+    letter-spacing:.18em;text-transform:uppercase;margin-bottom:22px}
+
+  footer{padding:14px 26px;border-top:1px solid var(--line);color:var(--dim);
+    font-size:.95rem;display:flex;gap:26px;flex-wrap:wrap;flex:none}
+  kbd{background:var(--card);border:1px solid var(--line);border-radius:6px;
+    padding:2px 8px;font:inherit;font-size:.88rem}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot" id="dot"></span>
+  <div class="heard" id="heard">dinleniyor…</div>
+</header>
+
+<main id="main">
+  <div class="waiting" id="waiting">
+    <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div>konuşulmasını bekliyor</div>
+  </div>
+</main>
+
+<footer>
+  <span><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> doğrudan seç</span>
+  <span><kbd>boşluk</kbd> sırayla gez</span>
+  <span><kbd>enter</kbd> seç</span>
+</footer>
+
+<div class="spoken" id="spoken" aria-live="assertive"></div>
+
+<script>
+(function(){
+  const main = document.getElementById('main');
+  const waiting = document.getElementById('waiting');
+  const heard = document.getElementById('heard');
+  const dot = document.getElementById('dot');
+  const spoken = document.getElementById('spoken');
+  const bars = [...document.getElementById('bars').children];
+
+  let candidates = [];
+  let scan = -1;            // single-switch scanning position
+  let busy = false;
+
+  function render(){
+    main.querySelectorAll('.opt').forEach(n => n.remove());
+    if(!candidates.length){ waiting.style.display=''; return; }
+    waiting.style.display='none';
+    candidates.forEach((c, i) => {
+      const b = document.createElement('button');
+      b.className = 'opt' + (c.kind === 'repair' ? ' repair' : '');
+      b.dataset.scan = (i === scan) ? '1' : '0';
+      b.innerHTML = `<span class="n">${i+1}</span><span>${escapeHtml(c.text)}</span>`;
+      b.addEventListener('click', () => choose(i));
+      main.appendChild(b);
+    });
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  async function choose(i){
+    if(busy || i < 0 || i >= candidates.length) return;
+    busy = true;
+    try{
+      const r = await fetch('/select', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({index:i})
+      });
+      if(!r.ok){ busy = false; return; }
+      const data = await r.json();
+      candidates = []; scan = -1; render();
+      show(data.text);
+      if(data.audio) new Audio(data.audio).play().catch(()=>{});
+    }catch(e){ /* the page must not die on a dropped request */ }
+    busy = false;
+  }
+
+  function show(text){
+    spoken.innerHTML = '<div><em>söylendi</em>' + escapeHtml(text) + '</div>';
+    spoken.classList.add('show');
+    setTimeout(() => spoken.classList.remove('show'), 3200);
+  }
+
+  document.addEventListener('keydown', e => {
+    if(e.key >= '1' && e.key <= '9'){ choose(+e.key - 1); e.preventDefault(); return; }
+    if(e.code === 'Space'){                       // one switch: advance
+      if(candidates.length){ scan = (scan + 1) % candidates.length; render(); }
+      e.preventDefault(); return;
+    }
+    if(e.key === 'Enter'){                        // one switch: commit
+      if(scan >= 0) choose(scan);
+      e.preventDefault();
+    }
+  });
+
+  const es = new EventSource('/events');
+  es.onmessage = ev => {
+    const s = JSON.parse(ev.data);
+    dot.classList.toggle('on', !!s.listening);
+    heard.innerHTML = s.partial ? '<b>' + escapeHtml(s.partial) + '</b>' : 'dinleniyor…';
+    const level = Math.min(1, (s.level || 0) / 1200);
+    bars.forEach((b, i) => {
+      const k = 0.35 + 0.65 * Math.abs(Math.sin((i + 1) * 1.7));
+      b.style.height = (6 + level * 28 * k) + 'px';
+    });
+    const next = s.candidates || [];
+    if(JSON.stringify(next) !== JSON.stringify(candidates)){
+      candidates = next;
+      scan = candidates.length ? 0 : -1;   // scanning starts on the first option
+      render();
+    }
+  };
+})();
+</script>
+</body>
+</html>

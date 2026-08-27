@@ -28,7 +28,7 @@ __all__ = [
     "LanguageModel", "Prompt", "ProviderError", "Synthesiser", "Transcriber",
     "TranscriptChunk", "Utterance", "VoiceRef",
     "OfflineLanguageModel", "OfflineSynthesiser", "OfflineTranscriber",
-    "resolve_language_model", "available_providers",
+    "resolve_language_model", "resolve_synthesiser", "available_providers",
 ]
 
 _KEYS = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
@@ -50,6 +50,28 @@ def _load(name: str) -> LanguageModel:
         from .openai_llm import OpenAILanguageModel
         return OpenAILanguageModel()
     raise ProviderError(f"unknown_provider: {name}")
+
+
+def resolve_synthesiser(explicit: Synthesiser | None = None) -> Synthesiser:
+    """Return the speech synthesiser to use.
+
+    Falls back to the offline synthesiser, which produces correctly-shaped silence.
+    That is a deliberate default: a silent file is obviously not speech, whereas a
+    stand-in voice reading a real sentence is a demo waiting to be mistaken for a
+    product.
+    """
+    if explicit is not None:
+        return explicit
+    if os.environ.get("SYMBORG_TTS_PROVIDER", "").strip().lower() == "offline":
+        return OfflineSynthesiser()
+    if os.environ.get("OPENAI_API_KEY"):
+        try:
+            from .openai_tts import OpenAISynthesiser
+            return OpenAISynthesiser()
+        except (ImportError, ProviderError) as exc:
+            warnings.warn(f"speech synthesis unavailable ({exc}); using silence.",
+                          RuntimeWarning, stacklevel=2)
+    return OfflineSynthesiser()
 
 
 def resolve_language_model(explicit: LanguageModel | None = None) -> LanguageModel:

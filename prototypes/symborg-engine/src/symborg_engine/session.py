@@ -15,7 +15,7 @@ from .candidate import Candidate, Offer
 from .context.transcript import Transcript
 from .context.vault import Vault
 from .generate.candidates import expand_abbreviation, generate_candidates
-from .providers import resolve_language_model
+from .providers import resolve_language_model, resolve_synthesiser
 from .providers.base import (
     LanguageModel, Synthesiser, TranscriptChunk, Utterance, VoiceRef,
 )
@@ -115,8 +115,7 @@ class Session:
 
     def __post_init__(self) -> None:
         self.model = resolve_language_model(self.model)
-        if self.synthesiser is None:
-            self.synthesiser = OfflineSynthesiser()
+        self.synthesiser = resolve_synthesiser(self.synthesiser)
 
     # -- input -----------------------------------------------------------------
 
