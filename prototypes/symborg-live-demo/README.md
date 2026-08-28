@@ -41,5 +41,6 @@ curl -sS -X POST http://127.0.0.1:8765/api/analyze \
 ## Tests
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover prototypes/symborg-live-demo/tests
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+  -t prototypes/symborg-live-demo -s prototypes/symborg-live-demo/tests
 ```

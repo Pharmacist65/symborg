@@ -13,7 +13,7 @@ PYTHONPATH=src python -m symborg_output_router.router examples/packets.json
 ## Test
 
 ```bash
-PYTHONPATH=src python -m unittest discover tests
+PYTHONPATH=src python -m unittest discover -t . -s tests
 ```
 
 ## Concept

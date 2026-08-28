@@ -39,9 +39,22 @@ SAKLAMA:
 - o an geçerli olan geçici durumlar ("şimdi yağmur yağıyor")
 - zaten herkesin bildiği genel bilgi
 - konuşanın kendi düşünmesi olan cümleler
+- BİRİNİN HATIRLAMAYA ÇALIŞTIĞI ŞEY. Bu en önemlisi:
+  "Bütçe 200 bindi galiba?" "Toplantı çarşambaydı değil mi?" "Sanırım salıydı"
+  Bu cümleler bilgi VERMİYOR, bilgi ARIYOR. Konuşan emin değil ve yanılıyor olabilir.
+  Bunları olgu diye saklarsan, kişinin yanlış hatırlaması senin hafızana geçer ve
+  iki hafta sonra ona o yanlışı sen söylersin. ALMA.
+  İşaretleri: "galiba", "sanırım", "herhalde", "değil mi", "-mıydı/-miydi", "yanılmıyorsam".
+  Ayrım: "Toplantıyı salıya aldık" bilgidir → sakla.
+         "Toplantı salıydı galiba" arayıştır → alma.
 
 Testi şu: bu kişi bunu iki hafta sonra ARAYABİLİR mi, ve kendi kafasında BULAMAZ mı?
 Hayırsa alma.
+
+KONUŞANIN KENDİ İFADESİNİ KORU. Saati, tarihi, rakamı ÇEVİRME:
+  "sekizde" → "sekizde"  ("08:00" YAZMA — akşam sekizi sabah sekizi yaparsın)
+  "ikiye"   → "ikiye"     "yarım"   → "yarım"     "150 bin" → "150 bin"
+Bir formata sokmak senin işin değil; kişi ne dediyse o hatırlanacak.
 
 Her madde TEK cümle ve KENDİ BAŞINA anlaşılır olmalı. İki şart:
 - "o dedi ki" değil → "Kerem Yıldız, Vega Yazılım'da ürün müdürü"
@@ -54,6 +67,8 @@ Her madde TEK cümle ve KENDİ BAŞINA anlaşılır olmalı. İki şart:
 
 Yalnızca JSON:
 {"items": [{"text": "...", "kind": "fact|date|person|number|commitment|decision|preference", "confidence": 0.0-1.0}]}
+
+confidence, KONUŞANIN emin olma derecesidir, senin değil. Tereddüt varsa 0.4'ün altı.
 
 Saklanacak bir şey yoksa {"items": []}. Emin değilsen alma."""
 

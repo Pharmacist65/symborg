@@ -7,10 +7,15 @@ line — including against the version of me that will later want it to be more 
 
 from __future__ import annotations
 
+import json
 import unittest
 
-from symborg_engine.copilot import Moment, Reason, SalienceGate
-from symborg_engine.copilot.judge import Judgement, judge_moment
+from symborg_engine.copilot import (Copilot, Heard, Memory, Moment, Reason,
+                                    Recollection, SalienceGate, Verdict)
+from symborg_engine.providers.offline import OfflineLanguageModel, OfflineSynthesiser
+from symborg_engine.copilot.contradiction import check as contradiction_check
+from symborg_engine.copilot.extract import extract
+from symborg_engine.copilot.judge import Judgement, decide, judge_moment
 from symborg_engine.providers.base import Prompt, ProviderError
 
 
@@ -275,3 +280,165 @@ class TestExtractionKeepsAlmostNothing(unittest.TestCase):
         items = [{"text": f"şey {i}", "kind": "fact", "confidence": 0.9} for i in range(10)]
         got = extract(_Model(json.dumps({"items": items})), "uzun konuşma")
         self.assertLessEqual(len(got), 4)
+
+
+class TestOneTurnCanSettleTwoThings(unittest.TestCase):
+    """A sentence often decides more than one thing. Keeping only the first was a real
+    failure: the meeting date survived and the budget silently did not."""
+
+    def test_two_facts_from_one_sentence_both_survive(self):
+        memory = Memory()
+        said = "Toplantıyı salı ikiye aldık, bütçeyi 150 bin yaptık."
+        self.assertTrue(memory.keep(Recollection(
+            "Toplantı salı saat ikiye alındı.", kind="date", source=said)))
+        self.assertTrue(memory.keep(Recollection(
+            "Bütçe 150 bin olarak karara bağlandı.", kind="number", source=said)))
+        self.assertEqual(len(memory.items), 2)
+
+    def test_the_same_fact_labelled_twice_is_one_fact(self):
+        memory = Memory()
+        memory.keep(Recollection("Bütçe 150 bin olarak karara bağlandı.", kind="number"))
+        self.assertFalse(memory.keep(
+            Recollection("Bütçe 150 bin olarak karara bağlandı.", kind="decision")))
+        self.assertEqual(len(memory.items), 1)
+
+
+class TestMentioningIsNotAsking(unittest.TestCase):
+    """A category cue is the weakest evidence there is. Acting on it in a plain
+    statement is how a copilot announces a meeting date to someone telling a joke."""
+
+    def setUp(self):
+        self.memory = Memory()
+        self.memory.keep(Recollection("Toplantı salı saat ikiye alındı.", kind="date"))
+        self.memory.keep(Recollection("Meze Han, Moda'da bir restoran.", kind="place"))
+
+    def test_a_statement_that_mentions_time_recalls_nothing(self):
+        for line in ("Çok komik bir şey oldu bugün.",
+                     "Hava çok güzel bugün ya.",
+                     "Yarın erken kalkmam lazım."):
+            with self.subTest(line=line):
+                self.assertEqual(self.memory.recall(line), [])
+
+    def test_a_question_that_reaches_for_a_time_still_recalls(self):
+        self.assertTrue(self.memory.recall("Toplantı ne zamandı?"))
+
+    def test_a_forgotten_word_still_recalls(self):
+        self.assertTrue(self.memory.recall("Akşam nereye gidecektik ya?"))
+
+
+class TestCopilotSaysNothing(unittest.TestCase):
+    """The normal output is silence. These are the ways it must not break."""
+
+    def _copilot(self, **kw):
+        clock = kw.pop("clock", lambda: 0.0)
+        return Copilot(model=OfflineLanguageModel(), synthesiser=OfflineSynthesiser(),
+                       memory=Memory(), clock=clock, **kw)
+
+    def test_an_empty_turn_says_nothing(self):
+        self.assertFalse(self._copilot().turn_ended("").spoke)
+
+    def test_muted_says_nothing(self):
+        self.assertFalse(self._copilot(muted=True).turn_ended("Toplantı ne zamandı?").spoke)
+
+    def test_a_sensitive_moment_says_nothing(self):
+        heard = self._copilot(sensitive=True).turn_ended("Babam ne zaman ölmüştü?")
+        self.assertFalse(heard.spoke)
+
+    def test_an_unusable_judgement_says_nothing(self):
+        """The offline model cannot judge. Something that cannot judge must not speak."""
+        heard = self._copilot().turn_ended("Toplantı çarşambaydı değil mi?")
+        self.assertFalse(heard.spoke)
+        self.assertEqual(heard.said, "")
+
+    def test_it_does_not_hear_its_own_echo(self):
+        """Storing before judging made it confirm the speaker back to themselves."""
+        copilot = self._copilot()
+        copilot.turn_ended("Toplantıyı salı ikiye aldık.")
+        self.assertTrue(copilot.memory.items)
+        self.assertFalse(copilot.history[0].spoke)
+
+    def test_speech_cannot_arrive_by_argument_position(self):
+        with self.assertRaises(TypeError):
+            Heard("x", Verdict.silent(Reason.NOTHING_NOTABLE), ("a", "b"))
+
+    def test_it_remembers_even_when_it_stays_quiet(self):
+        copilot = self._copilot()
+        heard = copilot.turn_ended("Kerem Yıldız, Vega Yazılım'da ürün müdürü.")
+        self.assertFalse(heard.spoke)
+        self.assertTrue(copilot.memory.items)
+
+    def test_silence_rate_starts_whole(self):
+        self.assertEqual(self._copilot().silence_rate, 1.0)
+
+
+class TestAGuessIsNotAFact(unittest.TestCase):
+    """Someone reaching for a figure is asking, not telling. Storing the attempt as
+    fact means their misremembering becomes yours, and a fortnight later you are the
+    one repeating it back to them."""
+
+    def test_a_hedged_recollection_is_dropped(self):
+        model = _Model(json.dumps({"items": [
+            {"text": "Bütçe 200 bin olarak konuşuldu.", "kind": "number", "confidence": 0.35}]}))
+        self.assertEqual(extract(model, "Bütçe 200 bindi galiba?"), [])
+
+    def test_a_settled_statement_is_kept(self):
+        model = _Model(json.dumps({"items": [
+            {"text": "Bütçe 150 bin olarak karara bağlandı.", "kind": "number",
+             "confidence": 0.95}]}))
+        self.assertEqual(len(extract(model, "Bütçeyi 150 bin yaptık.")), 1)
+
+
+class TestComparisonCannotBeTalkedOutOf(unittest.TestCase):
+    """Split from the judge after measurement: asked to weigh a wrong figure and social
+    appropriateness together, the model would find the mismatch and then reason its way
+    to silence — "they didn't ask", "the other one agreed". This half has no vocabulary
+    for any of that."""
+
+    def test_a_different_value_is_a_mismatch(self):
+        model = _Model(json.dumps({"differs": True, "correct": "150 bin", "field": "bütçe"}))
+        found = contradiction_check(model, "200 bin demiştik değil mi?", "Bütçe 150 bin.")
+        self.assertTrue(found)
+        self.assertEqual(found.correct, "150 bin")
+
+    def test_the_same_value_is_not(self):
+        model = _Model(json.dumps({"differs": False, "correct": "", "field": ""}))
+        self.assertFalse(contradiction_check(model, "150 bindi değil mi?", "Bütçe 150 bin."))
+
+    def test_nothing_known_is_nothing_to_compare(self):
+        model = _Model("never asked")
+        self.assertFalse(contradiction_check(model, "200 bin demiştik.", ""))
+        self.assertEqual(model.calls, [])
+
+    def test_a_long_correction_is_dropped(self):
+        model = _Model(json.dumps({"differs": True, "field": "x",
+                                   "correct": " ".join(["kelime"] * 20)}))
+        self.assertFalse(contradiction_check(model, "yanlış", "doğru"))
+
+    def test_a_provider_failure_is_not_a_mismatch(self):
+        self.assertFalse(contradiction_check(_Failing(), "200 bin", "150 bin"))
+
+    def test_unparseable_is_not_a_mismatch(self):
+        self.assertFalse(contradiction_check(_Model("not json at all"), "200", "150"))
+
+    def test_the_comparison_is_deterministic(self):
+        model = _Model(json.dumps({"differs": False, "correct": "", "field": ""}))
+        contradiction_check(model, "bir şey", "başka şey")
+        self.assertEqual(model.calls[0].temperature, 0.0)
+
+
+class TestDecideRunsComparisonFirst(unittest.TestCase):
+    """Everything the product speaks and everything the eval measures goes through
+    decide(); a benchmark on a different path measures a different product."""
+
+    def test_a_mismatch_short_circuits_the_judgement(self):
+        model = _Model(json.dumps({"differs": True, "correct": "salı", "field": "gün"}))
+        judgement = decide(model, "çarşambaydı değil mi?", "Toplantı salı.")
+        self.assertTrue(judgement.worth_it)
+        self.assertEqual(judgement.say, "salı")
+        self.assertEqual(len(model.calls), 1)      # the judge was never asked
+
+    def test_without_a_mismatch_the_judge_decides(self):
+        model = _Model(json.dumps({"differs": False, "correct": "", "field": "",
+                                   "worth_it": False, "score": 0.0, "say": "", "why": "-"}))
+        self.assertFalse(decide(model, "hava güzel", "Toplantı salı.").worth_it)
+        self.assertEqual(len(model.calls), 2)

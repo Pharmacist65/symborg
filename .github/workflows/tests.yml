@@ -54,16 +54,16 @@ jobs:
 
       - name: Assist engine
         working-directory: prototypes/symborg-engine
-        run: PYTHONPATH=src python -m unittest discover tests -v
+        run: PYTHONPATH=src python -m unittest discover -t . -s tests -v
 
       - name: Contextual whisper prototype
         working-directory: prototypes/contextual-whisper-demo
-        run: PYTHONPATH=src python -m unittest discover tests -v
+        run: PYTHONPATH=src python -m unittest discover -t . -s tests -v
 
       - name: Output router prototype
         working-directory: prototypes/output-router-demo
-        run: PYTHONPATH=src python -m unittest discover tests -v
+        run: PYTHONPATH=src python -m unittest discover -t . -s tests -v
 
       - name: Integrated live demo
         working-directory: prototypes/symborg-live-demo
-        run: python -m unittest discover tests -v
+        run: python -m unittest discover -t . -s tests -v

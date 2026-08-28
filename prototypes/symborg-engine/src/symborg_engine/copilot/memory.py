@@ -25,7 +25,8 @@ from pathlib import Path
 
 __all__ = ["Recollection", "Memory", "KINDS", "MAX_ITEMS"]
 
-KINDS = ("fact", "date", "person", "number", "commitment", "decision", "preference")
+KINDS = ("fact", "date", "person", "place", "number", "commitment", "decision",
+         "preference")
 """What is worth keeping. Everything not in this list is conversation, and
 conversation is meant to be let go."""
 
@@ -44,6 +45,8 @@ _KIND_CUES: dict[str, tuple[str, ...]] = {
     "commitment": ("söz", "vermiştik", "demiştik", "anlaştık", "taahhüt"),
     "decision": ("karar", "kararlaştır", "seçtik", "belirledik"),
     "preference": ("sever", "sevmez", "tercih", "istemez", "alışkan"),
+    "place": ("nerede", "nereye", "nereden", "neresi", "neredeydi", "mekan", "yer",
+              "adres", "gitmiştik", "gidecektik"),
 }
 
 _STOP = frozenset({
@@ -77,8 +80,34 @@ def _tokens(text: str) -> set[str]:
     }
 
 
+_SEARCHING = (
+    "?", " mi", " mı", " mu", " mü",
+    "ne zaman", "neydi", "nerede", "nereye", "nereden", "kimdi", "kimdi", "hangi",
+    "kaçtı", "kaçtaydı", "kim ", "ne kadar", "nasıldı",
+    "hatırlamıyorum", "hatırlayamıyorum", "aklıma gelmiyor", "unuttum", "unutmuşum",
+    "çıkmıyor", "bilmiyorum ya",
+)
+
+
+def _is_searching(query: str) -> bool:
+    """Whether this sentence is reaching for something, rather than merely mentioning it.
+
+    The distinction matters because a category cue is the weakest evidence there is.
+    "Bugün hava güzel" contains a time word without asking about time; treating it as a
+    search is how a copilot ends up announcing a meeting date to someone telling a joke.
+    """
+    lowered = _fold(query)
+    return any(cue in lowered for cue in _SEARCHING)
+
+
 def _sought_kinds(query: str) -> set[str]:
-    """Which kinds of thing this question is reaching for."""
+    """Which kinds of thing this question is reaching for.
+
+    Empty unless the sentence is actually searching: mentioning a day is not asking
+    about one.
+    """
+    if not _is_searching(query):
+        return set()
     lowered = _fold(query)
     return {kind for kind, cues in _KIND_CUES.items() if any(c in lowered for c in cues)}
 
@@ -106,7 +135,10 @@ class Recollection:
 
     @property
     def tokens(self) -> set[str]:
-        return _tokens(f"{self.text} {self.source}")
+        # Text only. The source sentence is provenance, not content: folding it in
+        # made every fact from one utterance look like the same fact, so a turn that
+        # settled both a date and a budget quietly kept only the date.
+        return _tokens(self.text)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -170,8 +202,9 @@ class Memory:
         if not incoming:
             return True           # nothing to remember
         for existing in reversed(self.items[-200:]):
-            if existing.kind != item.kind:
-                continue
+            # Compared across kinds on purpose. The kind is a label the extractor put
+            # on the fact, not the fact; "the budget is 150k" filed once as a number
+            # and once as a decision is still one thing that happened.
             overlap = incoming & existing.tokens
             union = incoming | existing.tokens
             if union and len(overlap) / len(union) >= 0.8:

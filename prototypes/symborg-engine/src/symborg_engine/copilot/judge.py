@@ -15,15 +15,17 @@ import json
 import re
 
 from ..providers.base import LanguageModel, Prompt, ProviderError
+from .contradiction import check
 
-__all__ = ["Judgement", "judge_moment", "JUDGE_SYSTEM", "JUDGE_SCHEMA"]
+__all__ = ["Judgement", "judge_moment", "decide", "JUDGE_SYSTEM", "JUDGE_SCHEMA"]
 
 JUDGE_SYSTEM = """Sen bir insanın yanında duran sessiz bir yardımcısın.
 
 Varsayılanın SUSMAK. Ama susmak da bir başarısızlık olabilir: bildiğin bir şeyi
 söylemediğin için biri bir randevuyu kaçırırsa, orada olmanın anlamı kalmaz.
 
-Sırayla üç soru sor. İlk "evet"te konuş, üçü de "hayır"sa sus.
+Sırayla iki soru sor. İlk "evet"te konuş, ikisi de "hayır"sa sus.
+(Yanlış hatırlamayı düzeltmek ayrı bir mekanizmanın işi; burada onu düşünme.)
 
 1. Odada CEVAPLANAMAYAN somut bir soru var mı, ve cevabı BİLDİKLERİN'de var mı?
    ("Ne zamandı?" "Adı neydi?" "Kaç para demiştik?" — ve biri "bilmiyorum" diyorsa)
@@ -38,23 +40,45 @@ Sırayla üç soru sor. İlk "evet"te konuş, üçü de "hayır"sa sus.
    Testi şu: cevabı duysa RAHATLAR mı, yoksa araya GİRMİŞ mi olursun?
    Emin değilsen duygu say ve sus.
 
-   TEK İSTİSNA — UNUTULAN AD, TARİH, RAKAM: "adı neydi ya", "hiç aklıma gelmiyor",
-   "dilimin ucunda" bir sitem değil, ARAYIŞTIR. Kişi o bilgiyi arıyor ve bulamıyor.
-   Cevabı biliyorsan söyle; bu, yardımın en saf hâli.
+   TEK İSTİSNA — GÖRÜNÜR ARAYIŞ. Kişi bir şeyi hatırlamaya ÇALIŞIYORSA, cümle
+   duygusal görünse bile arayıştır: cevabı biliyorsan söyle. Yardımın en saf hâli.
+     "adı neydi ya"  "hiç aklıma gelmiyor"  "dilimin ucunda"  "hatırlamıyorum"
+     "unuttum"  "çıkmıyor bir türlü"  "neydi o"  "ne zamandı"
 
-2. Şu an söylenen bir şey, BİLDİKLERİN'deki bir kayıtla ÇELİŞİYOR mu?
-   (rakam, tarih, isim, verilmiş bir söz)
-   → Evet ise KONUŞ. Kimse yanlış hatırladığını fark etmez.
+   AMA BU İSTİSNA YALNIZCA O İŞARETLERLE AÇILIR. Konunun hafızanda kayıtlı olması
+   yetmez; kişinin ARADIĞINI görmen gerekir.
+     "Şu projeyi bitirsek iyi olur."  → kimse bir tarih aramıyor. Sen teslim tarihini
+        biliyor olabilirsin; sorulmadı. SUS.
+     "Yarın toplantı var galiba."     → arayış yok. SUS.
+   Hafızanda cevabı var diye soru üretme. Arayış yoksa istisna da yoktur.
+   Bu istisna, aşağıdaki son süzgeçten önce gelir.
 
-3. Kişi doğrudan sana mı sordu?
+2. Kişi doğrudan sana mı sordu?
    → Evet ise KONUŞ.
 
-Üçü de hayırsa SUS. Sohbet, hâl hatır, şaka, plan yapma, duygusal an — hepsi sus.
+İkisi de hayırsa SUS. Sohbet, hâl hatır, şaka, plan YAPMA, duygusal an — hepsi sus.
+
+   PLAN YAPMA ile PLANI HATIRLAMA ayrı şeylerdir. Türkçe bunu ekle söyler:
+   "Akşam nereye gidelim?" / "ne yesek?"  → henüz karar yok. Plan yapıyorlar. SUS.
+   "Akşam nereye gidecektik?"             → karar VERİLMİŞ, unutulmuş. SÖYLE.
+   "Ne demiştik?" "Kaça anlaşmıştık?" "Nerede buluşacaktık?" → hepsi hatırlama. SÖYLE.
+   -AcAktI, -mIştI, "demiştik", "hani" geçmişte kalmış bir kararı arar; -AlIm, -sAk
+   henüz yok olan bir kararı önerir. Birincisinde cevabı biliyorsan söyle.
 Faydalı ama sorulmamış bilgi de sus; onu söylemek gürültüdür.
+
+SON SÜZGEÇ — SÖYLEYECEĞİN ŞEY, ÖNÜNDEKİ CÜMLENİN KARŞILIĞI OLMALI:
+Bir maddeye "evet" dedin diye BİLDİKLERİN'den eline geçen ilk şeyi söyleyemezsin.
+Cevabın, tam da o an konuşulan şeye değmiyorsa SUS.
+  "Bütçe 200 bindi galiba?" + bildiğin yalnızca toplantı saati → SUS. Bütçeyi bilmiyorsun.
+  "Yarın yağmur varmış."    + bildiğin toplantı saati          → SUS. Kimse sormadı.
+Testi şu: söyleyeceğin cümle, o kişinin AZ ÖNCE söylediği şeyle ilgili mi?
+İlgili değilse, doğru olması seni kurtarmaz.
+
+
 
 MUTLAK SUSMA: yas, ölüm, hastalık, kavga, ağlama. Ne bilirsen bil, sus.
 
-BİLDİKLERİN boşsa, 1 ve 2 otomatik olarak hayırdır — uydurma.
+BİLDİKLERİN boşsa, 1. madde otomatik olarak hayırdır — uydurma.
 
 Söyleyeceğin TEK cümle, en fazla 12 kelime. Kulağa fısıldanacak.
 Cevabı doğrudan ver: "12 Mart, saat iki." — "Hatırlatmak isterim ki..." deme.
@@ -62,7 +86,7 @@ Cevabı doğrudan ver: "12 Mart, saat iki." — "Hatırlatmak isterim ki..." dem
 Yalnızca JSON:
 {"worth_it": true|false, "score": 0.0-1.0, "say": "...", "why": "hangi madde"}
 
-worth_it false ise say boş. score: 1. madde ~0.9, 2. madde ~0.85, 3. madde ~0.8."""
+worth_it false ise say boş. score: 1. madde ~0.9, 2. madde ~0.8."""
 
 JUDGE_SCHEMA: dict = {
     "type": "object",
@@ -178,3 +202,22 @@ def _parse(raw: str) -> Judgement | None:
         )
     except (TypeError, ValueError):
         return None
+
+
+def decide(model: LanguageModel, said: str, known: str = "",
+           asked: bool = False) -> Judgement:
+    """The whole content decision: is there anything here worth a whisper.
+
+    Two mechanisms, deliberately kept apart. First a plain comparison against what is
+    known — mechanical, temperature zero, no vocabulary for politeness, so it cannot
+    talk itself out of a wrong date. Only then the judgement about whether an ordinary
+    moment deserves interrupting.
+
+    Everything the product speaks goes through here, and so does everything the eval
+    measures; a benchmark that exercises a different path measures a different product.
+    """
+    mismatch = check(model, said, known)
+    if mismatch:
+        return Judgement(worth_it=True, score=0.85, say=mismatch.correct,
+                         why=f"çelişki: {mismatch.field}")
+    return judge_moment(model, said, known, asked=asked)

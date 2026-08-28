@@ -11,7 +11,7 @@ Brief summary.
 
 ## Checklist
 
-- [ ] Prototype tests pass (`python -m unittest discover tests` in the affected prototype)
+- [ ] Prototype tests pass (`python -m unittest discover -t . -s tests` in the affected prototype)
 - [ ] No claim of medical benefit, diagnosis, or treatment has been introduced
 - [ ] Any new quantitative claim carries a source
 - [ ] Claim language follows the discipline in [docs/signal-to-response.md](../docs/signal-to-response.md) §6

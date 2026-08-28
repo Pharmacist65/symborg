@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from symborg_engine import Session, Transcript, Vault
-from symborg_engine.providers import resolve_language_model
+from symborg_engine.providers import resolve_language_model, resolve_synthesiser
 from symborg_engine.providers.offline import (
     OfflineLanguageModel, OfflineSynthesiser, OfflineTranscriber,
 )
@@ -45,13 +46,20 @@ class TestOfflineByDefault(unittest.TestCase):
         self.assertIn("text", payload[0])
 
     def test_resolve_falls_back_to_offline(self) -> None:
+        """With no credentials, the engine still runs.
+
+        Written to clear every credential rather than a named one: the earlier version
+        cleared only ANTHROPIC_API_KEY and quietly started passing for the wrong reason
+        once a second provider existed — it resolved a real client and called it a
+        fallback. A test that depends on which keys happen to be in the environment is
+        not testing anything.
+        """
         import os
-        previous = os.environ.pop("ANTHROPIC_API_KEY", None)
-        try:
+        clean = {k: v for k, v in os.environ.items()
+                 if not k.endswith("_API_KEY") and not k.startswith("SYMBORG_")}
+        with mock.patch.dict(os.environ, clean, clear=True):
             self.assertIsInstance(resolve_language_model(), OfflineLanguageModel)
-        finally:
-            if previous is not None:
-                os.environ["ANTHROPIC_API_KEY"] = previous
+            self.assertIsInstance(resolve_synthesiser(), OfflineSynthesiser)
 
     def test_offline_synthesiser_emits_valid_wav(self) -> None:
         utterance = OfflineSynthesiser().synthesise("Merhaba", VoiceRef(voice_id="v1"))

@@ -174,7 +174,7 @@ Prototype commands:
 cd prototypes/contextual-whisper-demo
 PYTHONPATH=src python -m symborg.heuristic_engine examples/dickens_context.txt --pause-ms 900 --delivery audio_whisper
 PYTHONPATH=src python -m symborg.evaluate evaluation/fixtures.jsonl
-PYTHONPATH=src python -m unittest discover tests
+PYTHONPATH=src python -m unittest discover -t . -s tests
 ```
 
 ## Feedback and Device Layer
@@ -212,7 +212,7 @@ Prototype commands:
 ```bash
 cd prototypes/output-router-demo
 PYTHONPATH=src python -m symborg_output_router.router examples/packets.json
-PYTHONPATH=src python -m unittest discover tests
+PYTHONPATH=src python -m unittest discover -t . -s tests
 ```
 
 ## Integrated Live Demo

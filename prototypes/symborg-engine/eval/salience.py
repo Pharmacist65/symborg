@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from symborg_engine.copilot import judge_moment  # noqa: E402
+from symborg_engine.copilot import decide  # noqa: E402
 from symborg_engine.providers import resolve_language_model  # noqa: E402
 
 SET = Path(__file__).with_name("salience.jsonl")
@@ -53,7 +53,7 @@ def main() -> int:
     print(f"\n{len(rows)} moments   provider: {type(model).__name__}\n")
 
     for row in rows:
-        judgement = judge_moment(model, row["transcript"], row.get("memory", ""))
+        judgement = decide(model, row["transcript"], row.get("memory", ""))
         spoke = judgement.worth_it
         should = bool(row["speak"])
         by_tag[row["tag"]].append(spoke == should)

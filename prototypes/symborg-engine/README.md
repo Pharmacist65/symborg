@@ -28,8 +28,14 @@ print('spoken:', s.speak(token).utterance.text)
 Run the tests:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover tests
+PYTHONPATH=src python3 -m unittest discover -t . -s tests
 ```
+
+The suite runs offline: `tests/__init__.py` clears provider credentials so a key in
+your shell cannot turn a unit run into a paid integration run. The `-t .` matters —
+without it discovery imports the test modules as top-level modules, the package
+initialiser never runs, and the tests quietly start calling the network. To exercise
+the real providers on purpose, set `SYMBORG_TEST_LIVE=1`.
 
 ## The authorship invariant
 
