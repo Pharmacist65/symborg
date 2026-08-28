@@ -94,6 +94,16 @@ class _Served:
             conn.close()
 
 
+class _Answers:
+    """A model with one canned reply, whatever it is asked."""
+
+    def __init__(self, reply: str) -> None:
+        self.reply = reply
+
+    def complete(self, prompt) -> str:
+        return self.reply
+
+
 class _LooksAt:
     """A model that records the picture it was shown."""
 
@@ -240,3 +250,59 @@ class TestTheCamera(unittest.TestCase):
         """A block of audio and a photograph are different sizes, and one limit for
         both would reject either the picture or nothing at all."""
         self.assertGreater(PHOTO_LIMIT, BLOCK_LIMIT)
+
+
+class TestBeingAddressedThroughThePage(unittest.TestCase):
+    """Press-to-talk. The audio keeps flowing through the same stream; the button only
+    marks which turn was meant for it, which is how an earpiece button would behave."""
+
+    PORT = 8772
+
+    def test_pressing_marks_the_next_turn(self):
+        with _Served(_copilot(), self.PORT) as served:
+            self.assertFalse(served.state.addressing)
+            served.request("POST", "/address", body=b"{}")
+            self.assertTrue(served.state.addressing)
+
+    def test_an_addressed_turn_always_says_something(self):
+        model = _Answers(json.dumps({"want": "unclear", "query": "",
+                                     "say_if_unclear": "Anlayamadım."}, ensure_ascii=False))
+        copilot = Copilot(model=model, synthesiser=OfflineSynthesiser(), memory=Memory(),
+                          situation=Situation(earpiece=True), clock=lambda: 0.0)
+        with _Served(copilot, self.PORT + 1) as served:
+            status, body = served.request("POST", "/asked",
+                                          body=json.dumps({"said": "bir şey"}).encode())
+            self.assertEqual(status, 200)
+            entry = json.loads(body)
+            self.assertTrue(entry["said"])
+            self.assertTrue(entry["addressed"])
+
+    def test_saying_nothing_is_rejected(self):
+        with _Served(_copilot(), self.PORT + 2) as served:
+            status, body = served.request("POST", "/asked",
+                                          body=json.dumps({"said": "   "}).encode())
+            self.assertEqual(status, 400)
+            self.assertEqual(json.loads(body)["error"], "nothing_said")
+
+    def test_a_broken_image_is_rejected_rather_than_ignored(self):
+        with _Served(_copilot(), self.PORT + 3) as served:
+            status, body = served.request(
+                "POST", "/asked",
+                body=json.dumps({"said": "bak şuna", "image": "!!!"}).encode())
+            self.assertEqual(status, 400)
+            self.assertEqual(json.loads(body)["error"], "bad_image")
+
+    def test_both_paths_draw_the_same_shape(self):
+        """The overheard and addressed paths share one entry builder so the page cannot
+        end up drawing two different things."""
+        model = _Answers(json.dumps({"want": "unclear", "query": "",
+                                     "say_if_unclear": "Ne?"}, ensure_ascii=False))
+        copilot = Copilot(model=model, synthesiser=OfflineSynthesiser(), memory=Memory(),
+                          situation=Situation(earpiece=True), clock=lambda: 0.0)
+        with _Served(copilot, self.PORT + 4) as served:
+            served.request("POST", "/asked",
+                           body=json.dumps({"said": "bir şey"}).encode())
+            entry = served.state.log[-1]
+            for key in ("at", "transcript", "said", "channel", "held", "remembered",
+                        "latency_ms", "audio", "addressed", "want", "sighting"):
+                self.assertIn(key, entry)

@@ -76,6 +76,28 @@ PYTHONPATH=src python3 -m symborg_engine.ui.copilot_server --cert cert.pem --key
 The phone will warn once that the certificate is self-signed, which it is. `*.pem` is
 gitignored: the pair you generate is yours alone.
 
+The page has a press-to-talk button. Hold it, say something, let go — the audio keeps
+flowing through the same stream, and the button only marks which turn was meant for the
+device rather than for the room. An earpiece button would do exactly the same thing,
+which is the point: the phone is standing in for hardware that does not exist yet.
+
+Being addressed is the exact inverse of everything else here. The gate does not apply,
+the rate limit does not apply, and mute does not apply — mute is the person's instruction
+and so is talking to it, and the later one wins. What takes judgement is working out what
+they wanted, because the answers come from different places:
+
+| said to it | goes to |
+|---|---|
+| "şu adamın adı neydi" | memory |
+| "baksana şuna, bu ne" | the camera — and it says *telefonu ona doğru tut* first |
+| "bunu İngilizce nasıl derim: hesabı alabilir miyiz" | the translator, carrying only the second half |
+| "kızımın doğum günü 12 Mart, bunu unutma" | memory, deliberately, outranking any score |
+| "her şeyi unut" | obeyed, never argued with |
+
+26/26 on `eval/addressed.py`. When it asks to be pointed at something the page opens the
+camera itself, rather than making the person find a button while still holding the thing
+up.
+
 The page also has a camera. Point it at something and ask, and it answers what it can
 see rather than the question you asked:
 

@@ -31,6 +31,7 @@ from pathlib import Path
 
 from ..copilot import Copilot, Memory, Situation
 from ..copilot.look import look
+from ..copilot.translate import Translator
 from ..providers.browser_audio import SAMPLE_RATE, BrowserSource
 from ..tls import ensure_trust_store
 from .server import Broadcaster, QuietServer
@@ -50,10 +51,16 @@ class CopilotState:
 
     copilot: Copilot
     source: BrowserSource
+    translator: Translator | None = None
     heard: str = ""
     listening: bool = False
     turns: int = 0
     spoke: int = 0
+    asked_count: int = 0
+    addressing: bool = False
+    """The next turn is meant for it. Set by the page's press-to-talk, and it stays set
+    until that turn actually closes — the person releases the button before the words
+    have finished arriving."""
     log: list[dict] = field(default_factory=list)
 
     def snapshot(self) -> dict:
@@ -63,6 +70,8 @@ class CopilotState:
             "turns": self.turns,
             "spoke": self.spoke,
             "silence": round(self.copilot.silence_rate, 3),
+            "asked": self.asked_count,
+            "addressing": self.addressing,
             "remembered": len(self.copilot.memory.items),
             "situation": {
                 "earpiece": self.copilot.situation.earpiece,
@@ -83,6 +92,32 @@ def _lan_address() -> str:
         return "127.0.0.1"
     finally:
         probe.close()
+
+
+def _entry(heard, audio: dict) -> dict:
+    """What the page draws for one turn. Shared by the overheard and addressed paths so
+    they cannot drift apart."""
+    entry = {
+        "at": time.strftime("%H:%M"),
+        "transcript": heard.transcript,
+        "said": heard.said,
+        "channel": heard.delivery.channel.value if heard.delivery else "none",
+        "held": heard.delivery.held.value if heard.delivery and heard.delivery.held
+                else None,
+        "remembered": list(heard.remembered),
+        "latency_ms": heard.latency_ms,
+        "audio": None,
+        "addressed": False,
+        "want": heard.address.want.value if heard.address else None,
+        "sighting": heard.sighting,
+    }
+    if heard.utterance is not None:
+        key = str(int(time.time() * 1000))
+        audio[key] = heard.utterance.audio
+        for stale in list(audio)[:-8]:
+            audio.pop(stale, None)
+        entry["audio"] = f"/audio/{key}"
+    return entry
 
 
 def _handler(state: CopilotState, bus: Broadcaster, audio: dict):
@@ -178,6 +213,38 @@ def _handler(state: CopilotState, bus: Broadcaster, audio: dict):
                 )
                 bus.publish(state.snapshot())
                 self._json({"ok": True})
+            elif self.path == "/address":
+                # Press-to-talk. The audio keeps flowing through the same stream; this
+                # only marks which turn was meant for it, which is also how an earpiece
+                # button would behave.
+                state.addressing = True
+                bus.publish(state.snapshot())
+                self._json({"ok": True})
+            elif self.path == "/asked":
+                try:
+                    payload = json.loads(body or b"{}")
+                except json.JSONDecodeError:
+                    self._json({"error": "bad_request"}, 400)
+                    return
+                said = str(payload.get("said", "")).strip()
+                if not said:
+                    self._json({"error": "nothing_said"}, 400)
+                    return
+                image = None
+                if payload.get("image"):
+                    try:
+                        image = base64.b64decode(payload["image"], validate=True)
+                    except (ValueError, binascii.Error):
+                        self._json({"error": "bad_image"}, 400)
+                        return
+                heard = state.copilot.asked(said, image=image,
+                                            translator=state.translator)
+                state.asked_count += 1
+                entry = _entry(heard, audio)
+                entry["addressed"] = True
+                state.log.append(entry)
+                bus.publish(state.snapshot())
+                self._json(entry)
             elif self.path == "/look":
                 try:
                     payload = json.loads(body or b"{}")
@@ -249,26 +316,22 @@ def _listen(state: CopilotState, bus: Broadcaster, audio: dict, language: str) -
             bus.publish(state.snapshot())
             continue
 
+        if state.addressing:
+            state.addressing = False
+            heard = state.copilot.asked(fragment.text, translator=state.translator)
+            state.asked_count += 1
+            state.heard = ""
+            entry = _entry(heard, audio)
+            entry["addressed"] = True
+            state.log.append(entry)
+            bus.publish(state.snapshot())
+            continue
+
         heard = state.copilot.turn_ended(fragment.text)
         state.turns += 1
         state.heard = ""
-        entry = {
-            "at": time.strftime("%H:%M"),
-            "transcript": heard.transcript,
-            "said": heard.said,
-            "channel": heard.delivery.channel.value if heard.delivery else "none",
-            "held": heard.delivery.held.value if heard.delivery and heard.delivery.held
-                    else None,
-            "remembered": list(heard.remembered),
-            "latency_ms": heard.latency_ms,
-            "audio": None,
-        }
-        if heard.utterance is not None:
-            key = str(int(time.time() * 1000))
-            audio[key] = heard.utterance.audio
-            for stale in list(audio)[:-8]:
-                audio.pop(stale, None)
-            entry["audio"] = f"/audio/{key}"
+        entry = _entry(heard, audio)
+        if entry["audio"]:
             state.spoke += 1
         state.log.append(entry)
         bus.publish(state.snapshot())
@@ -276,10 +339,12 @@ def _listen(state: CopilotState, bus: Broadcaster, audio: dict, language: str) -
 
 def serve(copilot: Copilot, port: int = DEFAULT_PORT, language: str = "tr",
           certfile: str | None = None, keyfile: str | None = None,
-          bind: str = "0.0.0.0") -> None:
+          bind: str = "0.0.0.0", mine: str = "Türkçe",
+          theirs: str = "İngilizce") -> None:
     """Run the page and the engine together until interrupted."""
     source = BrowserSource()
-    state = CopilotState(copilot=copilot, source=source)
+    state = CopilotState(copilot=copilot, source=source,
+                         translator=Translator(copilot.model, mine=mine, theirs=theirs))
     bus = Broadcaster()
     audio: dict[str, bytes] = {}
 
@@ -325,6 +390,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--key", default=None)
     parser.add_argument("--memory", default=None, help="Where to keep what it hears")
     parser.add_argument("--bind", default="0.0.0.0")
+    parser.add_argument("--mine", default="Türkçe", help="The person's own language")
+    parser.add_argument("--theirs", default="İngilizce", help="What to translate into")
     args = parser.parse_args(argv)
 
     ensure_trust_store()
@@ -333,7 +400,8 @@ def main(argv: list[str] | None = None) -> int:
                                           others_present=True))
     print(f"\n  sample rate {SAMPLE_RATE} Hz   language {args.language}")
     serve(copilot, port=args.port, language=args.language,
-          certfile=args.cert, keyfile=args.key, bind=args.bind)
+          certfile=args.cert, keyfile=args.key, bind=args.bind,
+          mine=args.mine, theirs=args.theirs)
     return 0
 
 

@@ -63,9 +63,20 @@
   #note { margin-top: 11px; font-size: 12px; color: var(--held); text-align: center; }
   #camera { display: none; }
   #shoot {
-    width: 100%; margin-top: 8px; padding: 15px; font: inherit; font-size: 15px;
+    flex: 1; padding: 15px; font: inherit; font-size: 15px;
     border-radius: 12px; border: 1px solid var(--line); background: transparent;
     color: var(--fg);
+  }
+  #row { display: flex; gap: 8px; margin-top: 8px; }
+  #talk {
+    flex: 1; padding: 15px; font: inherit; font-size: 15px; font-weight: 600;
+    border-radius: 12px; border: 1px solid var(--ear); background: transparent;
+    color: var(--ear); touch-action: none; user-select: none;
+  }
+  #talk.holding { background: var(--ear); color: #04211c; }
+  .addressed .said-by-them { color: var(--fg); }
+  .addressed .said-by-them::before {
+    content: 'sen: '; color: var(--ear); font-size: 12px; letter-spacing: .1em;
   }
   .sighting { margin-top: 9px; font-size: 14px; color: var(--dim); }
   .sighting ul { margin: 6px 0 0; padding-left: 18px; }
@@ -98,7 +109,10 @@
     <button data-key="others_present">yanımda biri var</button>
     <button data-key="screen_visible">ekran görünür</button>
   </div>
-  <button id="shoot">Bir şeye bak</button>
+  <div id="row">
+    <button id="talk">Bas ve konuş</button>
+    <button id="shoot">Bir şeye bak</button>
+  </div>
   <input type="file" id="camera" accept="image/*" capture="environment">
   <div id="note"></div>
 </footer>
@@ -111,6 +125,21 @@ const empty = document.getElementById('empty'), start = document.getElementById(
 const note = document.getElementById('note');
 let ctx, node, media, pending = [], running = false, seen = 0, situation = {};
 const shoot = document.getElementById('shoot'), camera = document.getElementById('camera');
+const talk = document.getElementById('talk');
+let pendingQuestion = '';
+
+// Press and hold. The audio keeps flowing through the same stream — this only marks
+// which turn was meant for it, the way an earpiece button would.
+const hold = e => {
+  e.preventDefault();
+  if (!running) { note.textContent = 'Önce dinlemeye başla.'; return; }
+  talk.classList.add('holding');
+  fetch('/address', { method: 'POST', body: '{}' });
+};
+const release = () => talk.classList.remove('holding');
+talk.addEventListener('pointerdown', hold);
+talk.addEventListener('pointerup', release);
+talk.addEventListener('pointercancel', release);
 
 const TAG = { ear: 'kulağa', screen: 'ekranda', room: 'sesli' };
 
@@ -124,11 +153,12 @@ new EventSource('/events').onmessage = e => {
   if (s.log.length) empty.style.display = 'none';
   for (const entry of s.log.slice(seen)) render(entry);
   seen = s.log.length;
+  talk.classList.toggle('holding', !!s.addressing);
 };
 
 function render(entry) {
   const el = document.createElement('div');
-  el.className = 'turn';
+  el.className = entry.addressed ? 'turn addressed' : 'turn';
   const them = document.createElement('div');
   them.className = 'said-by-them';
   them.textContent = entry.transcript;
@@ -141,6 +171,12 @@ function render(entry) {
     w.append(document.createTextNode(entry.said));
     el.append(w);
     if (entry.audio) new Audio(entry.audio).play().catch(() => {});
+    // It asked to be pointed at something. Open the camera rather than making the
+    // person find the button while still holding the thing up.
+    if (entry.want === 'look' && !entry.sighting) {
+      pendingQuestion = entry.transcript;
+      setTimeout(() => camera.click(), 400);
+    }
   } else if (entry.held) {
     const h = document.createElement('div');
     h.className = 'held';
@@ -211,10 +247,17 @@ camera.onchange = async () => {
     let binary = '';
     for (let i = 0; i < bytes.length; i += 0x8000)
       binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    const question = prompt('Ne sormak istersin?', 'Bu ne?');
-    if (question === null) return;
-    await fetch('/look', { method: 'POST', body: JSON.stringify({
-      image: btoa(binary), question, mime: file.type || 'image/jpeg' }) });
+    if (pendingQuestion) {
+      // It already heard the question and asked for the camera; do not ask again.
+      await fetch('/asked', { method: 'POST', body: JSON.stringify({
+        said: pendingQuestion, image: btoa(binary) }) });
+      pendingQuestion = '';
+    } else {
+      const question = prompt('Ne sormak istersin?', 'Bu ne?');
+      if (question === null) return;
+      await fetch('/look', { method: 'POST', body: JSON.stringify({
+        image: btoa(binary), question, mime: file.type || 'image/jpeg' }) });
+    }
     empty.style.display = 'none';
   } catch {
     note.textContent = 'Fotoğraf gönderilemedi.';
