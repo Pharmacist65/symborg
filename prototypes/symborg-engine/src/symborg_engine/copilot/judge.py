@@ -108,13 +108,18 @@ interruption rises with its length."""
 class Judgement:
     """What the judge concluded."""
 
-    __slots__ = ("worth_it", "score", "say", "why")
+    __slots__ = ("worth_it", "score", "say", "why", "perishable")
 
-    def __init__(self, worth_it: bool, score: float, say: str, why: str) -> None:
+    def __init__(self, worth_it: bool, score: float, say: str, why: str,
+                 perishable: bool = False) -> None:
         self.worth_it = bool(worth_it)
         self.score = max(0.0, min(1.0, float(score)))
         self.say = " ".join(say.split())
         self.why = why.strip()
+        self.perishable = bool(perishable)
+        """Whether this stops being useful once the moment passes. A correction does —
+        said three sentences late it reopens something the room had settled. A recalled
+        name does not; it keeps until the person looks down."""
 
     @property
     def is_too_long(self) -> bool:
@@ -122,7 +127,7 @@ class Judgement:
 
     def to_dict(self) -> dict:
         return {"worth_it": self.worth_it, "score": round(self.score, 3),
-                "say": self.say, "why": self.why}
+                "say": self.say, "why": self.why, "perishable": self.perishable}
 
     def __repr__(self) -> str:
         return f"Judgement({'speak' if self.worth_it else 'silent'}, {self.score:.2f})"
@@ -219,5 +224,5 @@ def decide(model: LanguageModel, said: str, known: str = "",
     mismatch = check(model, said, known)
     if mismatch:
         return Judgement(worth_it=True, score=0.85, say=mismatch.correct,
-                         why=f"çelişki: {mismatch.field}")
+                         why=f"çelişki: {mismatch.field}", perishable=True)
     return judge_moment(model, said, known, asked=asked)

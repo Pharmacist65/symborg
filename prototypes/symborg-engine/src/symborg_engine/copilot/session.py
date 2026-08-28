@@ -21,6 +21,7 @@ from ..turntaking import TurnMonitor
 from .extract import extract
 from .judge import decide
 from .memory import Memory, Recollection
+from .output import Channel, Delivery, Situation, route
 from .salience import Moment, Reason, SalienceGate, Verdict
 
 __all__ = ["Copilot", "Heard"]
@@ -42,6 +43,7 @@ class Heard:
     said: str = field(default="", kw_only=True)
     remembered: tuple[str, ...] = field(default=(), kw_only=True)
     utterance: Utterance | None = field(default=None, kw_only=True)
+    delivery: Delivery | None = field(default=None, kw_only=True)
     latency_ms: int = field(default=0, kw_only=True)
 
     def __post_init__(self) -> None:
@@ -55,6 +57,7 @@ class Heard:
     def to_dict(self) -> dict:
         return {"transcript": self.transcript, "said": self.said,
                 "remembered": list(self.remembered), "latency_ms": self.latency_ms,
+                "delivery": self.delivery.to_dict() if self.delivery else None,
                 **self.verdict.to_dict()}
 
 
@@ -77,6 +80,11 @@ class Copilot:
     monitor: TurnMonitor = field(default_factory=TurnMonitor)
     transcript: Transcript = field(default_factory=Transcript)
     voice: VoiceRef = field(default_factory=lambda: VoiceRef(voice_id="offline"))
+    situation: Situation = field(default_factory=Situation)
+    """What is true around the person: whether a private channel exists, whether the
+    screen can be glanced at, whether anyone else is present. Defaults to the cautious
+    reading — company, no earpiece — so a caller that knows nothing gets the quiet
+    behaviour."""
     remember: bool = True
     muted: bool = False
     sensitive: bool = False
@@ -150,11 +158,23 @@ class Copilot:
             return self._record(Heard(text, Verdict.silent(reason, judgement.score),
                                       remembered=self._store(text), latency_ms=_now_ms() - started))
 
-        utterance = self.synthesiser.synthesise(judgement.say, self.voice)
+        delivery = route(judgement.say, self.situation,
+                         perishable=judgement.perishable)
+        if not delivery.delivered:
+            # Worth saying, with nowhere to say it. Not the same as having nothing to
+            # say, and the reason is kept so a caller can show why it stayed quiet.
+            return self._record(Heard(
+                text, Verdict.silent(Reason.NOTHING_NOTABLE, judgement.score),
+                remembered=self._store(text), delivery=delivery,
+                latency_ms=_now_ms() - started))
+
+        utterance = None
+        if delivery.channel in (Channel.EAR, Channel.ROOM):
+            utterance = self.synthesiser.synthesise(delivery.text, self.voice)
         self.gate.spoke(at_s)
         return self._record(Heard(
-            transcript=text, verdict=verdict, said=judgement.say,
-            remembered=self._store(text), utterance=utterance,
+            transcript=text, verdict=verdict, said=delivery.text,
+            remembered=self._store(text), utterance=utterance, delivery=delivery,
             latency_ms=_now_ms() - started,
         ))
 
