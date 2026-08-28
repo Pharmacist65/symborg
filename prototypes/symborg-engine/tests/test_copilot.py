@@ -148,3 +148,130 @@ class TestWhisperLength(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMemoryKeepsLittle(unittest.TestCase):
+    """The difference between a recording and a memory is selection."""
+
+    def setUp(self) -> None:
+        from symborg_engine.copilot import Memory
+        self.memory = Memory()
+
+    def test_the_same_fact_is_not_kept_twice(self) -> None:
+        """Repetition is normal in conversation; five copies of one fact is not."""
+        from symborg_engine.copilot import Recollection
+        self.assertTrue(self.memory.keep(Recollection("Bütçe 150 bin olarak belirlendi", kind="number")))
+        self.assertFalse(self.memory.keep(Recollection("Bütçe 150 bin olarak belirlendi", kind="number")))
+        self.assertEqual(len(self.memory.items), 1)
+
+    def test_an_empty_recollection_is_not_kept(self) -> None:
+        from symborg_engine.copilot import Recollection
+        self.assertFalse(self.memory.keep(Recollection("   ")))
+
+    def test_an_unknown_kind_falls_back_rather_than_raising(self) -> None:
+        from symborg_engine.copilot import Recollection
+        self.assertEqual(Recollection("bir şey", kind="telepathy").kind, "fact")
+
+
+class TestRecall(unittest.TestCase):
+    def setUp(self) -> None:
+        from symborg_engine.copilot import Memory, Recollection
+        self.memory = Memory()
+        for text, kind in [
+            ("Meze Han, Moda'daki restorana dün akşam gidildi.", "fact"),
+            ("Kerem Yıldız, Vega Yazılım'da ürün müdürü.", "person"),
+            ("Toplantı salı saat 14:00'a alındı.", "date"),
+            ("Bütçe 150 bin.", "number"),
+        ]:
+            self.memory.keep(Recollection(text, kind=kind))
+
+    def test_turkish_suffixes_do_not_break_recall(self) -> None:
+        """'restoranın' and 'restorana' are the same word; exact matching says
+        otherwise, and recall missed what it was literally asked for."""
+        found = self.memory.recall("o restoranın adı neydi", limit=1)
+        self.assertIn("Meze Han", found[0].text)
+
+    def test_a_forgotten_word_is_found_by_the_kind_of_thing_it_was(self) -> None:
+        """The case the product exists for: the person cannot supply the word they
+        would have searched with."""
+        found = self.memory.recall("adamın adı neydi", limit=1)
+        self.assertIn("Kerem", found[0].text)
+
+    def test_naming_the_thing_beats_guessing_its_category(self) -> None:
+        """'restoranın adı' cues both a place and a person; the named one must win."""
+        found = self.memory.recall("o restoranın adı neydi", limit=1)
+        self.assertIn("Meze", found[0].text)
+
+    def test_recall_returns_nothing_rather_than_something_irrelevant(self) -> None:
+        self.assertEqual(self.memory.recall("hava nasıldı"), [])
+
+    def test_render_is_empty_when_nothing_is_known(self) -> None:
+        """The judge must be told plainly it knows nothing, not left to fill a gap."""
+        self.assertEqual(self.memory.render("hava nasıldı"), "")
+
+
+class TestMemoryIsThePersons(unittest.TestCase):
+    """A memory a person cannot edit is surveillance with a friendly name."""
+
+    def setUp(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from symborg_engine.copilot import Memory, Recollection
+        self._tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self._tmp.name) / "memory.jsonl"
+        self.memory = Memory.open(self.path)
+        for text, kind in [("Bütçe 150 bin.", "number"), ("Kerem Yıldız, ürün müdürü.", "person")]:
+            self.memory.keep(Recollection(text, kind=kind))
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_memory_survives_a_restart(self) -> None:
+        from symborg_engine.copilot import Memory
+        self.assertEqual(len(Memory.open(self.path).items), 2)
+
+    def test_a_person_can_forget_one_thing(self) -> None:
+        from symborg_engine.copilot import Memory
+        removed = self.memory.forget(lambda i: i.kind == "person")
+        self.assertEqual(removed, 1)
+        self.assertEqual(len(Memory.open(self.path).items), 1)
+
+    def test_a_person_can_forget_everything(self) -> None:
+        from symborg_engine.copilot import Memory
+        self.memory.forget_all()
+        self.assertEqual(Memory.open(self.path).items, [])
+
+    def test_a_corrupt_line_does_not_hide_the_rest(self) -> None:
+        from symborg_engine.copilot import Memory
+        self.path.write_text('{"text": "bir", "kind": "fact"}\nbroken\n'
+                             '{"text": "iki", "kind": "fact"}\n', encoding="utf-8")
+        self.assertEqual([i.text for i in Memory.open(self.path).items], ["bir", "iki"])
+
+    def test_an_unwritable_store_does_not_break_the_conversation(self) -> None:
+        from symborg_engine.copilot import Memory, Recollection
+        memory = Memory.open("/nonexistent-root/x/memory.jsonl")
+        self.assertTrue(memory.keep(Recollection("bir şey", kind="fact")))
+
+
+class TestExtractionKeepsAlmostNothing(unittest.TestCase):
+    def test_a_provider_failure_keeps_nothing(self) -> None:
+        from symborg_engine.copilot import extract
+        self.assertEqual(extract(_Failing(), "toplantı salı"), [])
+
+    def test_an_unparseable_reply_keeps_nothing(self) -> None:
+        from symborg_engine.copilot import extract
+        self.assertEqual(extract(_Model("nope"), "toplantı salı"), [])
+
+    def test_a_low_confidence_item_is_dropped(self) -> None:
+        """An uncertain memory is worse than none: it will be recalled as fact."""
+        import json
+        from symborg_engine.copilot import extract
+        reply = json.dumps({"items": [{"text": "belki salı", "kind": "date", "confidence": 0.3}]})
+        self.assertEqual(extract(_Model(reply), "belki salı olur"), [])
+
+    def test_a_turn_cannot_yield_unlimited_memories(self) -> None:
+        import json
+        from symborg_engine.copilot import extract
+        items = [{"text": f"şey {i}", "kind": "fact", "confidence": 0.9} for i in range(10)]
+        got = extract(_Model(json.dumps({"items": items})), "uzun konuşma")
+        self.assertLessEqual(len(got), 4)
