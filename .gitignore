@@ -27,3 +27,9 @@ __pycache__/
 # Local environment
 .env
 .env.*
+
+# TLS material. The copilot server needs a certificate so a phone's browser will hand
+# over its microphone, and the one you generate is yours alone.
+*.pem
+cert.pem
+key.pem

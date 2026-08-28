@@ -37,6 +37,49 @@ without it discovery imports the test modules as top-level modules, the package
 initialiser never runs, and the tests quietly start calling the network. To exercise
 the real providers on purpose, set `SYMBORG_TEST_LIVE=1`.
 
+## The copilot, on a phone
+
+The routing work settled the hardware question. Run one afternoon of conversation
+through four situations and the third row is the product:
+
+| situation | channel |
+|---|---|
+| earpiece | ear — it lands |
+| meeting, phone on the table | screen — it lands, silently |
+| meeting, phone in a pocket | nothing at all |
+| alone at home | the loudspeaker tells nobody |
+
+In the situation this exists for — someone else talking, a wrong date being agreed — a
+pocketed phone has no way through. The earpiece is not an accessory to choose later; it
+is the channel. So phase A is the phone as microphone, ear and screen, with the engine
+running elsewhere:
+
+```bash
+PYTHONPATH=src python3 -m symborg_engine.ui.copilot_server
+```
+
+It prints two addresses. The second is reachable from a phone on the same network — but
+a browser will not hand over a microphone on a plain-HTTP page unless the address is
+localhost, so from a phone that page can watch and cannot listen. For the microphone,
+make a certificate for your own address and pass it:
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout key.pem -out cert.pem -subj "/CN=$(ipconfig getifaddr en0)" \
+  -addext "subjectAltName=IP:$(ipconfig getifaddr en0)"
+```
+
+```bash
+PYTHONPATH=src python3 -m symborg_engine.ui.copilot_server --cert cert.pem --key key.pem
+```
+
+The phone will warn once that the certificate is self-signed, which it is. `*.pem` is
+gitignored: the pair you generate is yours alone.
+
+The page has three switches — earpiece, someone with me, screen visible — because the
+routing depends on them and only the person knows. They are why the same sentence goes
+to the ear in one room and nowhere in another.
+
 ## The authorship invariant
 
 > Nothing is ever spoken that the person did not explicitly select.
