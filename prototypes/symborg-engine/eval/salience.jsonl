@@ -1,0 +1,26 @@
+{"transcript": "Nasılsın? İyiyim, sen nasılsın? Ben de iyiyim.", "memory": "", "speak": 0, "tag": "sohbet"}
+{"transcript": "Yarın ne yapsak acaba? Bilmem, sen söyle.", "memory": "", "speak": 0, "tag": "sohbet"}
+{"transcript": "Çok komikti ya, dün gece gülmekten kırıldık.", "memory": "", "speak": 0, "tag": "sohbet"}
+{"transcript": "Bugün hava çok güzel, biraz yürüyelim mi?", "memory": "", "speak": 0, "tag": "sohbet"}
+{"transcript": "Ha bu arada annemler cumartesi geliyor.", "memory": "", "speak": 0, "tag": "sohbet"}
+{"transcript": "Kahve ister misin? Yok sağ ol, az önce içtim.", "memory": "", "speak": 0, "tag": "sohbet"}
+{"transcript": "Bugün biraz yorgunum.", "memory": "Uyku: 5 saat. Dün 4 saat.", "speak": 0, "tag": "sorulmadi"}
+{"transcript": "Şu projeyi bitirsek iyi olur.", "memory": "Proje teslim tarihi 30 Mart.", "speak": 0, "tag": "sorulmadi"}
+{"transcript": "Neden bu kadar erken gitti ki...", "memory": "Ölüm nedeni: kalp krizi, 12 Mart.", "speak": 0, "tag": "retorik"}
+{"transcript": "Ben şimdi ne yapacağım?", "memory": "Randevu 20 Mart.", "speak": 0, "tag": "retorik"}
+{"transcript": "Nasıl dayanacağım buna?", "memory": "Merhum Ahmet Bey, 42 yaşında.", "speak": 0, "tag": "retorik"}
+{"transcript": "Ne yapsam bilmiyorum ki artık.", "memory": "Görüşme 5 Nisan.", "speak": 0, "tag": "retorik"}
+{"transcript": "Çok özlüyorum onu.", "memory": "Merhum Ahmet Bey, 3 çocuk babası.", "speak": 0, "tag": "duygusal"}
+{"transcript": "Bir daha konuşmayacağım seninle, sen hep böyle yapıyorsun.", "memory": "Geçen ay da tartışıldı.", "speak": 0, "tag": "duygusal"}
+{"transcript": "Ağlamak istiyorum bazen.", "memory": "Terapi randevusu 8 Nisan.", "speak": 0, "tag": "duygusal"}
+{"transcript": "Şu adamın adı neydi ya? Hiç aklıma gelmiyor.", "memory": "Kerem Yıldız, Vega Yazılım, ürün müdürü.", "speak": 1, "tag": "unutulan-ad"}
+{"transcript": "Dilimin ucunda ama çıkmıyor, kızının adı neydi?", "memory": "Kızı: Deniz, 8 yaşında.", "speak": 1, "tag": "unutulan-ad"}
+{"transcript": "Toplantı ne zamandı? Valla ben de unuttum.", "memory": "12 Mart Salı 14:00 — bütçe toplantısı.", "speak": 1, "tag": "unutulan-tarih"}
+{"transcript": "Cenaze kaçtaydı?", "memory": "Cenaze 14:00, Karacaahmet.", "speak": 1, "tag": "bilgi-sorusu"}
+{"transcript": "Doktor randevusu ne zamandı? Bilmiyorum ki.", "memory": "20 Mart, Dr. Yılmaz.", "speak": 1, "tag": "bilgi-sorusu"}
+{"transcript": "O restoranın adı neydi, hani geçen gittiğimiz?", "memory": "Meze Han, Moda — 14 Şubat'ta gidildi.", "speak": 1, "tag": "unutulan-ad"}
+{"transcript": "Bütçeyi 200 bin demiştik değil mi? Evet öyleydi.", "memory": "Bütçe 150 bin olarak karara bağlandı.", "speak": 1, "tag": "celiski"}
+{"transcript": "Toplantı çarşambaydı galiba. Evet çarşamba.", "memory": "Toplantı: Salı 12 Mart.", "speak": 1, "tag": "celiski"}
+{"transcript": "Ona söz vermemiştik ki. Hayır vermedik.", "memory": "3 Mart: 'yardım edeceğiz' sözü verildi.", "speak": 1, "tag": "celiski"}
+{"transcript": "Toplantı ne zamandı? Hatırlamıyorum.", "memory": "", "speak": 0, "tag": "hafiza-bos"}
+{"transcript": "Adı neydi bu adamın?", "memory": "", "speak": 0, "tag": "hafiza-bos"}
