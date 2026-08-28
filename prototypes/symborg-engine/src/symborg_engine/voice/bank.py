@@ -24,11 +24,20 @@ import time
 import wave
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from ..providers.base import VoiceRef
-from .consent import Consent, ConsentError
+from .consent import Consent, ConsentError, ConsentScope
 
-__all__ = ["VoiceBank", "ENROLMENT_SCRIPT", "MIN_CLIP_SECONDS", "TARGET_SECONDS"]
+__all__ = ["VoiceBank", "ENROLMENT_SCRIPT", "MIN_CLIP_SECONDS", "TARGET_SECONDS",
+           "SPEECH_TARGET_SECONDS"]
+
+SPEECH_TARGET_SECONDS = 2_700.0
+"""Connected speech to collect beyond the script, in seconds — 45 minutes.
+
+Cloning services state much lower minimums, but their floor is not the number that
+matters. Quality rises well past it, and this recording happens once, while the person
+can still give it. Under-collecting is not recoverable later."""
 
 SAMPLE_RATE = 24_000
 MIN_CLIP_SECONDS = 2.0
@@ -115,32 +124,83 @@ class VoiceBank:
 
     # -- consent ---------------------------------------------------------------
 
-    def grant_consent(self, person: str, note: str = "") -> Consent:
+    def grant_consent(self, person: str, note: str = "",
+                      recording: str | Path | None = None,
+                      scope: ConsentScope | None = None,
+                      granted_by: str = "") -> Consent:
         """Record that this person agreed their voice may be reproduced.
 
-        Must happen before any recording is kept. Consent obtained after the fact is
-        not consent to the recording that already exists.
+        Must happen before any recording is kept: consent obtained afterwards is not
+        consent to audio that already exists.
+
+        Args:
+            recording: The person reading the terms aloud. Strongly recommended — a
+                tick box cannot be verified once they can no longer confirm it.
+            granted_by: A named proxy, when the person can no longer consent
+                themselves. Left empty for self-consent, which is the stronger form.
         """
         if not person.strip():
             raise ConsentError("no_person_named")
-        self.consent = Consent(person=person.strip(), note=note)
+        self.consent = Consent(
+            person=person.strip(), note=note, granted_by=granted_by.strip(),
+            scope=scope or ConsentScope(),
+        )
+        if recording is not None:
+            self.consent.attach_recording(recording)
         self.consent.save(self.root / "consent.json")
         return self.consent
 
-    def withdraw_consent(self) -> None:
-        """Revoke consent and delete the recordings.
+    def withdraw_consent(self, delete_remote: "Callable[[str, str], bool] | None" = None) -> dict:
+        """Revoke consent, delete the recordings, and remove the remote voice.
 
-        Withdrawal that leaves the audio on disk is not withdrawal.
+        Withdrawal that stops at this machine is not withdrawal. The recordings go, but
+        so must the trained voice wherever it lives — otherwise "delete my voice"
+        deletes nothing that matters.
+
+        Args:
+            delete_remote: Called with ``(provider, voice_id)`` to remove the voice at
+                the service that holds it. Should return True on success. If it is not
+                supplied, or it fails, the record says so rather than claiming a
+                deletion that did not happen.
+
+        Returns:
+            What was actually done, so a caller can tell the person the truth.
         """
+        outcome = {"local_clips_deleted": 0, "remote_provider": "",
+                   "remote_deleted": False, "remote_error": ""}
+
         if self.consent is not None:
             self.consent.withdraw()
-            self.consent.save(self.root / "consent.json")
+
+        provider = self.provider.get("provider", "")
+        voice_id = self.provider.get("voice_id", "")
+        if provider and voice_id:
+            outcome["remote_provider"] = provider
+            if delete_remote is None:
+                outcome["remote_error"] = "no_deletion_handler"
+            else:
+                try:
+                    outcome["remote_deleted"] = bool(delete_remote(provider, voice_id))
+                    if not outcome["remote_deleted"]:
+                        outcome["remote_error"] = "provider_refused"
+                except Exception as exc:
+                    outcome["remote_error"] = f"{type(exc).__name__}: {exc}"
+
         for clip in self.clips:
             Path(clip.path).unlink(missing_ok=True)
+            outcome["local_clips_deleted"] += 1
         self.clips = []
         self._save_script()
         (self.root / "provider.json").unlink(missing_ok=True)
         self.provider = {}
+
+        if self.consent is not None:
+            # Only claim propagation when there was nothing remote, or it really went.
+            self.consent.withdrawal_propagated = (
+                not outcome["remote_provider"] or outcome["remote_deleted"]
+            )
+            self.consent.save(self.root / "consent.json")
+        return outcome
 
     def require_consent(self) -> Consent:
         if self.consent is None:
@@ -226,14 +286,18 @@ class VoiceBank:
         (self.root / "provider.json").write_text(
             json.dumps(self.provider, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def voice_ref(self) -> VoiceRef:
+    def voice_ref(self, *, cloud_synthesis: bool = True, device: str = "") -> VoiceRef:
         """The reference the synthesiser should use.
 
         Raises:
-            ConsentError: if consent is missing or withdrawn. The check lives here
-                rather than at the call site so that no path to synthesis can skip it.
+            ConsentError: if consent is missing, withdrawn, or does not cover what is
+                about to happen. The check lives here rather than at the call site so
+                that no path to synthesis can skip it.
         """
-        consent = self.require_consent()
+        if self.consent is None:
+            raise ConsentError("no_consent_record")
+        self.consent.require_valid(cloud_synthesis=cloud_synthesis, device=device)
+        consent = self.consent
         voice_id = self.provider.get("voice_id", "")
         if not voice_id:
             raise ConsentError("no_voice_attached")

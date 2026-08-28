@@ -92,9 +92,13 @@ class Session:
     transcript: Transcript = field(default_factory=Transcript)
     candidate_count: int = 3
     monitor: TurnMonitor = field(default_factory=TurnMonitor)
+    journal: str | None = None
+    """Where to record every sentence spoken in this person's name, across sessions."""
+    consent_id: str = ""
     _ledger: AuthorizationLedger = field(
         default_factory=AuthorizationLedger, init=False, repr=False, compare=False,
     )
+    """Replaced in __post_init__ once the journal path is known."""
     _current: Offer | None = field(default=None, init=False, repr=False, compare=False)
     _rejections: list[str] = field(
         default_factory=list, init=False, repr=False, compare=False,
@@ -114,6 +118,7 @@ class Session:
     and worth a second call to avoid."""
 
     def __post_init__(self) -> None:
+        self._ledger = AuthorizationLedger(journal=self.journal, consent_id=self.consent_id)
         self.model = resolve_language_model(self.model)
         self.synthesiser = resolve_synthesiser(self.synthesiser)
 

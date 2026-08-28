@@ -14,11 +14,13 @@ expires. There is deliberately no public constructor that produces a valid token
 from __future__ import annotations
 
 import hmac
+import json
 import os
 import secrets
 import time
 from dataclasses import dataclass, field
 from hashlib import sha256
+from pathlib import Path
 
 from .candidate import Candidate, Offer
 
@@ -71,11 +73,23 @@ class AuthorizationLedger:
     token cannot be fabricated by constructing the dataclass directly.
     """
 
-    def __init__(self, ttl_ms: int = DEFAULT_TTL_MS) -> None:
+    def __init__(self, ttl_ms: int = DEFAULT_TTL_MS,
+                 journal: str | Path | None = None,
+                 consent_id: str = "") -> None:
+        """
+        Args:
+            journal: Where to append every spoken sentence, as JSON lines. Without it
+                the record lives only in memory and dies with the session — which
+                answers "what was said in my name?" with nothing.
+            consent_id: The consent this session speaks under, written into each entry
+                so an utterance can always be traced to what was agreed.
+        """
         self._secret = secrets.token_bytes(32)
         self._ttl_ms = ttl_ms
         self._spent: set[str] = set()
         self._log: list[dict] = []
+        self._journal = Path(journal) if journal else None
+        self._consent_id = consent_id
 
     # -- minting ---------------------------------------------------------------
 
@@ -126,14 +140,33 @@ class AuthorizationLedger:
         """Verify a token, consume it, and return the text that may be spoken."""
         self.verify(token, now_ms=now_ms)
         self._spent.add(token.nonce)
-        self._log.append({
+        entry = {
             "text": token.text,
             "candidate_id": token.candidate_id,
             "offer_id": token.offer_id,
             "origin": "user_confirmed",
+            "consent_id": self._consent_id,
             "spoken_at_ms": _now_ms() if now_ms is None else now_ms,
-        })
+        }
+        self._log.append(entry)
+        self._append_to_journal(entry)
         return token.text
+
+    def _append_to_journal(self, entry: dict) -> None:
+        """Write one utterance to disk.
+
+        A journal that cannot be written must not stop someone speaking, so a failure
+        here is swallowed — but the entry stays in memory, so nothing is silently lost
+        within the session.
+        """
+        if self._journal is None:
+            return
+        try:
+            self._journal.parent.mkdir(parents=True, exist_ok=True)
+            with self._journal.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
 
     # -- audit -----------------------------------------------------------------
 
@@ -145,6 +178,27 @@ class AuthorizationLedger:
         is always clear which words the person actually chose.
         """
         return list(self._log)
+
+    @staticmethod
+    def read_journal(path: str | Path) -> list[dict]:
+        """Every sentence ever spoken from a journal, across all sessions.
+
+        This is what makes the record answerable rather than merely kept: a person, or
+        someone acting for them, can see what has been said in their name.
+        """
+        p = Path(path)
+        if not p.exists():
+            return []
+        entries: list[dict] = []
+        for line in p.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue      # one bad line must not hide the rest of the history
+        return entries
 
     # -- internals -------------------------------------------------------------
 

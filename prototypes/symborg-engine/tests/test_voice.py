@@ -139,3 +139,214 @@ class VoiceBankTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConsentRecordingTest(unittest.TestCase):
+    """A tick box cannot be verified once the person can no longer confirm it."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name) / "voice"
+        self.bank = VoiceBank.open(self.root)
+        self.rec = Path(self._tmp.name) / "consent.wav"
+        self.rec.write_bytes(b"RIFF" + b"\x00" * 2000)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_a_recording_is_fingerprinted(self) -> None:
+        consent = self.bank.grant_consent("Ayşe", recording=self.rec)
+        self.assertTrue(consent.recording_sha256)
+        self.assertTrue(consent.recording_is_intact)
+        self.assertTrue(consent.is_verifiable)
+
+    def test_a_tampered_recording_stops_verifying(self) -> None:
+        """The record must show it is no longer the audio that was agreed to."""
+        consent = self.bank.grant_consent("Ayşe", recording=self.rec)
+        self.rec.write_bytes(b"RIFF" + b"\xff" * 2000)
+        self.assertFalse(consent.recording_is_intact)
+        self.assertFalse(consent.is_verifiable)
+
+    def test_a_missing_recording_is_refused(self) -> None:
+        """A record pointing at nothing is worse than one admitting it has none."""
+        with self.assertRaises(ConsentError):
+            self.bank.grant_consent("Ayşe", recording=self.root / "nope.wav")
+
+    def test_consent_without_a_recording_is_valid_but_not_verifiable(self) -> None:
+        consent = self.bank.grant_consent("Ayşe")
+        self.assertTrue(consent.is_valid)
+        self.assertFalse(consent.is_verifiable)
+
+
+class ConsentScopeTest(unittest.TestCase):
+    """Scope is checked, not hoped for."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.bank = VoiceBank.open(Path(self._tmp.name) / "voice")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_cloud_synthesis_can_be_refused(self) -> None:
+        from symborg_engine.voice import ConsentScope
+        self.bank.grant_consent("Ayşe", scope=ConsentScope(allow_cloud_synthesis=False))
+        self.bank.attach_provider_voice("test", "v-1")
+        with self.assertRaises(ConsentError) as ctx:
+            self.bank.voice_ref(cloud_synthesis=True)
+        self.assertEqual(str(ctx.exception), "cloud_synthesis_not_consented")
+        self.bank.voice_ref(cloud_synthesis=False)      # on-device is still fine
+
+    def test_proxy_selection_is_off_unless_agreed(self) -> None:
+        consent = self.bank.grant_consent("Ayşe")
+        with self.assertRaises(ConsentError) as ctx:
+            consent.require_valid(proxy_selection=True)
+        self.assertEqual(str(ctx.exception), "proxy_selection_not_consented")
+
+    def test_a_device_outside_the_record_is_refused(self) -> None:
+        from symborg_engine.voice import ConsentScope
+        self.bank.grant_consent("Ayşe", scope=ConsentScope(devices=("tablet-1",)))
+        self.bank.attach_provider_voice("test", "v-1")
+        self.bank.voice_ref(device="tablet-1")
+        with self.assertRaises(ConsentError):
+            self.bank.voice_ref(device="someone-elses-phone")
+
+    def test_scope_survives_reopening(self) -> None:
+        from symborg_engine.voice import ConsentScope
+        root = self.bank.root
+        self.bank.grant_consent("Ayşe", scope=ConsentScope(allow_cloud_synthesis=False))
+        reopened = VoiceBank.open(root)
+        self.assertFalse(reopened.consent.scope.allow_cloud_synthesis)
+
+
+class WithdrawalPropagationTest(unittest.TestCase):
+    """Withdrawal that stops at this machine is not withdrawal.
+
+    The clone keeps working wherever it was trained, so "delete my voice" would delete
+    nothing that matters.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name) / "voice"
+        self.bank = VoiceBank.open(self.root)
+        self.bank.grant_consent("Ayşe")
+        self.bank.add_clip(0, SILENCE)
+        self.bank.attach_provider_voice("elevenlabs", "v-remote-1")
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_deletion_reaches_the_provider(self) -> None:
+        called: list[tuple[str, str]] = []
+
+        def delete(provider: str, voice_id: str) -> bool:
+            called.append((provider, voice_id))
+            return True
+
+        outcome = self.bank.withdraw_consent(delete_remote=delete)
+        self.assertEqual(called, [("elevenlabs", "v-remote-1")])
+        self.assertTrue(outcome["remote_deleted"])
+        self.assertTrue(self.bank.consent.withdrawal_propagated)
+
+    def test_without_a_handler_propagation_is_not_claimed(self) -> None:
+        outcome = self.bank.withdraw_consent()
+        self.assertFalse(outcome["remote_deleted"])
+        self.assertEqual(outcome["remote_error"], "no_deletion_handler")
+        self.assertFalse(self.bank.consent.withdrawal_propagated)
+
+    def test_a_failing_provider_is_reported_not_hidden(self) -> None:
+        def delete(provider: str, voice_id: str) -> bool:
+            raise RuntimeError("service unreachable")
+
+        outcome = self.bank.withdraw_consent(delete_remote=delete)
+        self.assertIn("service unreachable", outcome["remote_error"])
+        self.assertFalse(self.bank.consent.withdrawal_propagated)
+
+    def test_local_audio_goes_even_when_the_provider_fails(self) -> None:
+        """The part that can be honoured must be honoured."""
+        clip = Path(self.bank.clips[0].path)
+        self.bank.withdraw_consent(delete_remote=lambda p, v: False)
+        self.assertFalse(clip.exists())
+
+    def test_nothing_remote_counts_as_fully_propagated(self) -> None:
+        bank = VoiceBank.open(Path(self._tmp.name) / "voice2")
+        bank.grant_consent("Mehmet")
+        bank.withdraw_consent()
+        self.assertTrue(bank.consent.withdrawal_propagated)
+
+
+class JournalTest(unittest.TestCase):
+    """What was said in this person's name has to outlive the session."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self._tmp.name) / "spoken.jsonl"
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _session(self):
+        from symborg_engine import Session
+        from symborg_engine.providers.base import Prompt
+
+        class _Model:
+            def complete(self, prompt: Prompt) -> str:
+                return '[{"text": "Evet.", "kind": "reply", "confidence": 0.9}]'
+
+        return Session(model=_Model(), journal=str(self.path), consent_id="c-123")
+
+    def test_an_utterance_survives_the_session(self) -> None:
+        from symborg_engine.authorship import AuthorizationLedger
+
+        session = self._session()
+        session.hear("Ağrın var mı?")
+        session.offer()
+        session.speak(session.select(0))
+        del session
+
+        entries = AuthorizationLedger.read_journal(self.path)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["text"], "Evet.")
+        self.assertEqual(entries[0]["origin"], "user_confirmed")
+
+    def test_every_entry_names_the_consent_it_spoke_under(self) -> None:
+        from symborg_engine.authorship import AuthorizationLedger
+
+        session = self._session()
+        session.hear("Ağrın var mı?")
+        session.offer()
+        session.speak(session.select(0))
+        self.assertEqual(AuthorizationLedger.read_journal(self.path)[0]["consent_id"], "c-123")
+
+    def test_sessions_accumulate_rather_than_overwrite(self) -> None:
+        from symborg_engine.authorship import AuthorizationLedger
+
+        for _ in range(3):
+            session = self._session()
+            session.hear("Ağrın var mı?")
+            session.offer()
+            session.speak(session.select(0))
+        self.assertEqual(len(AuthorizationLedger.read_journal(self.path)), 3)
+
+    def test_a_corrupt_line_does_not_hide_the_rest(self) -> None:
+        from symborg_engine.authorship import AuthorizationLedger
+
+        self.path.write_text('{"text": "bir"}\nnot json\n{"text": "iki"}\n', encoding="utf-8")
+        entries = AuthorizationLedger.read_journal(self.path)
+        self.assertEqual([e["text"] for e in entries], ["bir", "iki"])
+
+    def test_an_unwritable_journal_does_not_stop_someone_speaking(self) -> None:
+        from symborg_engine import Session
+        from symborg_engine.providers.base import Prompt
+
+        class _Model:
+            def complete(self, prompt: Prompt) -> str:
+                return '[{"text": "Evet.", "kind": "reply", "confidence": 0.9}]'
+
+        session = Session(model=_Model(), journal="/nonexistent-root/x/spoken.jsonl")
+        session.hear("Ağrın var mı?")
+        session.offer()
+        spoken = session.speak(session.select(0))       # must not raise
+        self.assertEqual(spoken.utterance.text, "Evet.")
+        self.assertEqual(len(session.spoken), 1)        # still kept in memory
