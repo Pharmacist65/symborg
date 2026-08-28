@@ -149,3 +149,66 @@ class UITest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DisconnectTest(unittest.TestCase):
+    """A browser hanging up is normal, not an error.
+
+    Refreshes, favicon requests and event-stream reconnects close sockets constantly.
+    Reporting each one buries the conversation in tracebacks and makes a working system
+    look broken — which is exactly how it was first seen in use.
+    """
+
+    def setUp(self) -> None:
+        UITest.port += 1
+        self.port = UITest.port
+        self.base = f"http://127.0.0.1:{self.port}"
+        self.state = UIState(session=Session(model=_Model(), synthesiser=_Synth()))
+        self.bus = Broadcaster()
+        self.server = serve(self.state, self.bus, port=self.port)
+
+    def tearDown(self) -> None:
+        self.server.shutdown()
+
+    def test_reset_and_broken_pipe_are_swallowed(self) -> None:
+        import io
+        import sys
+
+        captured = io.StringIO()
+        original, sys.stderr = sys.stderr, captured
+        try:
+            for exc in (ConnectionResetError(), BrokenPipeError(), ConnectionAbortedError()):
+                try:
+                    raise exc
+                except Exception:
+                    self.server.handle_error(None, ("127.0.0.1", 1))
+        finally:
+            sys.stderr = original
+        self.assertEqual(captured.getvalue(), "")
+
+    def test_a_real_error_is_still_reported(self) -> None:
+        import io
+        import sys
+
+        captured = io.StringIO()
+        original, sys.stderr = sys.stderr, captured
+        try:
+            try:
+                raise ValueError("something genuinely wrong")
+            except Exception:
+                self.server.handle_error(None, ("127.0.0.1", 1))
+        finally:
+            sys.stderr = original
+        self.assertIn("something genuinely wrong", captured.getvalue())
+
+    def test_favicon_does_not_404(self) -> None:
+        """Browsers always ask; a 404 for it is noise, not information."""
+        with urllib.request.urlopen(self.base + "/favicon.ico", timeout=8) as response:
+            self.assertEqual(response.status, 204)
+
+    def test_an_abandoned_event_stream_unsubscribes(self) -> None:
+        stream = urllib.request.urlopen(self.base + "/events", timeout=8)
+        stream.read(1)
+        stream.close()
+        threading.Event().wait(0.3)
+        self.bus.publish({"partial": "still alive"})   # must not raise

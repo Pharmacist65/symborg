@@ -25,7 +25,7 @@ from pathlib import Path
 from ..authorship import AuthorizationError
 from ..session import Session
 
-__all__ = ["Broadcaster", "UIState", "serve"]
+__all__ = ["Broadcaster", "UIState", "QuietServer", "serve"]
 
 STATIC = Path(__file__).parent / "static"
 
@@ -49,6 +49,26 @@ class UIState:
             "listening": self.listening,
             "level": self.level,
         }
+
+
+class QuietServer(ThreadingHTTPServer):
+    """Threading server that does not report a browser hanging up as a failure.
+
+    Browsers close connections constantly — refreshing, requesting a favicon,
+    reconnecting an event stream — and each one surfaces as ConnectionResetError or
+    BrokenPipeError. Printing a traceback for every one buries the conversation in
+    noise and makes a working system look broken. Anything else still raises.
+    """
+
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def handle_error(self, request, client_address) -> None:
+        import sys
+        exc = sys.exception()
+        if isinstance(exc, (ConnectionResetError, BrokenPipeError, ConnectionAbortedError)):
+            return
+        super().handle_error(request, client_address)
 
 
 class Broadcaster:
@@ -95,12 +115,16 @@ def _handler(state: UIState, bus: Broadcaster, audio: dict):
         # -- responses ---------------------------------------------------------
 
         def _send(self, code: int, body: bytes, ctype: str) -> None:
-            self.send_response(code)
-            self.send_header("Content-Type", ctype)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.send_response(code)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                if body:
+                    self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass          # the page closed mid-response
 
         def _json(self, payload: dict, code: int = 200) -> None:
             self._send(code, json.dumps(payload, ensure_ascii=False).encode(),
@@ -112,6 +136,8 @@ def _handler(state: UIState, bus: Broadcaster, audio: dict):
             if self.path in ("/", "/index.html"):
                 body = (STATIC / "index.html").read_bytes()
                 self._send(200, body, "text/html; charset=utf-8")
+            elif self.path == "/favicon.ico":
+                self._send(204, b"", "image/x-icon")
             elif self.path == "/events":
                 self._events()
             elif self.path.startswith("/audio/"):
@@ -174,8 +200,8 @@ def _handler(state: UIState, bus: Broadcaster, audio: dict):
                     except queue.Empty:
                         self.wfile.write(b": keep-alive\n\n")
                     self.wfile.flush()
-            except (BrokenPipeError, ConnectionResetError):
-                pass
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass          # the page went away; nothing to report
             finally:
                 bus.unsubscribe(q)
 
@@ -183,11 +209,10 @@ def _handler(state: UIState, bus: Broadcaster, audio: dict):
 
 
 def serve(state: UIState, bus: Broadcaster, host: str = "127.0.0.1",
-          port: int = 8770) -> ThreadingHTTPServer:
+          port: int = 8770) -> QuietServer:
     """Start the interface on a background thread."""
     audio: dict[str, bytes] = {}
-    server = ThreadingHTTPServer((host, port), _handler(state, bus, audio))
-    server.daemon_threads = True
+    server = QuietServer((host, port), _handler(state, bus, audio))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
