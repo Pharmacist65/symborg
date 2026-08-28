@@ -201,3 +201,39 @@ class TestCarefulIsOptOut(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestKeepingOneAppAlive(unittest.TestCase):
+    """These are AOSP rather than Samsung-proprietary, so they behave the same on One UI.
+    The Samsung "Sleeping apps" keys are deliberately absent: guessing at a settings key
+    is how you set something that does nothing and believe you have."""
+
+    def test_the_exemptions_are_reversible(self):
+        for step in provision.keep_awake("com.example"):
+            with self.subTest(target=step.target):
+                self.assertTrue(step.undo)
+                self.assertNotEqual(step.do, step.undo)
+
+    def test_they_restore_to_default_rather_than_deny(self):
+        """Undo means "as it was", and appops was not previously denied."""
+        for step in provision.keep_awake("com.example"):
+            if step.kind == "appops":
+                self.assertEqual(step.undo[-1], "default")
+
+    def test_an_app_that_is_not_installed_is_skipped(self):
+        with mock.patch.object(provision, "installed", return_value=set()), \
+             mock.patch.object(provision, "adb", return_value=_adb()):
+            steps = provision.plan(app="com.not.here")
+        self.assertFalse(any(s.kind in ("battery", "appops") for s in steps))
+
+    def test_an_installed_app_gets_them(self):
+        with mock.patch.object(provision, "installed", return_value={"com.android.chrome"}), \
+             mock.patch.object(provision, "adb", return_value=_adb()):
+            steps = provision.plan(app="com.android.chrome")
+        self.assertTrue(any(s.kind == "battery" for s in steps))
+
+    def test_the_desk_setting_is_opt_in(self):
+        with mock.patch.object(provision, "installed", return_value=set()), \
+             mock.patch.object(provision, "adb", return_value=_adb()):
+            self.assertFalse(any(s.kind == "desk" for s in provision.plan()))
+            self.assertTrue(any(s.kind == "desk" for s in provision.plan(desk=True)))

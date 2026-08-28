@@ -123,6 +123,37 @@ SETTINGS = [
 ]
 
 
+# What the app that runs all day needs, whatever that app turns out to be. Today it is a
+# browser; tomorrow it is an APK. These are AOSP, not Samsung-proprietary, so they behave
+# the same on One UI as anywhere else — the Samsung-specific "Sleeping apps" keys are
+# deliberately not here, because they are undocumented and guessing at a settings key is
+# how you set something that does nothing and believe you have.
+def keep_awake(package: str) -> list["Step"]:
+    return [
+        Step(kind="battery", target=package,
+             why="exempt from doze, or it stops when the phone decides you are not using it",
+             do=["shell", "dumpsys", "deviceidle", "whitelist", f"+{package}"],
+             undo=["shell", "dumpsys", "deviceidle", "whitelist", f"-{package}"]),
+        Step(kind="appops", target=f"{package} RUN_IN_BACKGROUND",
+             why="allowed to run with nothing on screen",
+             do=["shell", "cmd", "appops", "set", package, "RUN_IN_BACKGROUND", "allow"],
+             undo=["shell", "cmd", "appops", "set", package, "RUN_IN_BACKGROUND", "default"]),
+        Step(kind="appops", target=f"{package} RUN_ANY_IN_BACKGROUND",
+             why="allowed to hold a wake lock",
+             do=["shell", "cmd", "appops", "set", package, "RUN_ANY_IN_BACKGROUND", "allow"],
+             undo=["shell", "cmd", "appops", "set", package, "RUN_ANY_IN_BACKGROUND",
+                   "default"]),
+    ]
+
+
+DESK = [
+    # For the phone sitting on a desk, plugged in, being watched. Not for carrying.
+    ("stayon", "screen stays on while charging, so a desk test is not a series of taps",
+     ["shell", "svc", "power", "stayon", "usb"],
+     ["shell", "svc", "power", "stayon", "false"]),
+]
+
+
 @dataclass(slots=True)
 class Step:
     """One thing to do, and the thing that undoes it."""
@@ -155,7 +186,8 @@ def installed() -> set[str]:
     return {line.split(":", 1)[1].strip() for line in out.splitlines() if ":" in line}
 
 
-def plan(remove_careful: bool = False) -> list[Step]:
+def plan(remove_careful: bool = False, app: str | None = None,
+         desk: bool = False) -> list[Step]:
     here = installed()
     steps: list[Step] = []
 
@@ -187,6 +219,16 @@ def plan(remove_careful: bool = False) -> list[Step]:
             do=["shell", "settings", "put", namespace, key, wanted], undo=undo,
         ))
 
+    if app:
+        if app not in here:
+            print(f"\n  {app} is not installed on this phone; skipping its exemptions.")
+        else:
+            steps.extend(keep_awake(app))
+
+    if desk:
+        for target, why, do, undo in DESK:
+            steps.append(Step(kind="desk", target=target, why=why, do=do, undo=undo))
+
     return steps
 
 
@@ -206,6 +248,11 @@ def show(steps: list[Step]) -> None:
     if settings:
         print(f"\n  Change {len(settings)} settings:\n")
         for step in settings:
+            print(f"    {step.target:52} {step.why}")
+    other = [s for s in steps if s.kind not in ("uninstall", "setting")]
+    if other:
+        print(f"\n  {len(other)} more:\n")
+        for step in other:
             print(f"    {step.target:52} {step.why}")
     print(f"\n  {len(steps)} steps. Every one is written to {JOURNAL} and undone by --undo.\n")
 
@@ -256,6 +303,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--undo", action="store_true", help="Reverse everything recorded")
     parser.add_argument("--careful", action="store_true",
                         help="Also remove SMS, calls, email, gallery and contacts")
+    parser.add_argument("--app", default=None,
+                        help="Package to exempt from battery management, e.g. "
+                             "com.android.chrome")
+    parser.add_argument("--desk", action="store_true",
+                        help="Keep the screen on while charging, for a phone being watched")
     args = parser.parse_args(argv)
 
     if adb("version").returncode != 0:
@@ -278,7 +330,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.undo:
         return undo()
 
-    steps = plan(remove_careful=args.careful)
+    steps = plan(remove_careful=args.careful, app=args.app, desk=args.desk)
     show(steps)
     if not args.apply:
         print("  This was a dry run. Add --apply to do it.\n")
