@@ -100,13 +100,14 @@ def _is_searching(query: str) -> bool:
     return any(cue in lowered for cue in _SEARCHING)
 
 
-def _sought_kinds(query: str) -> set[str]:
+def _sought_kinds(query: str, asked: bool = False) -> set[str]:
     """Which kinds of thing this question is reaching for.
 
     Empty unless the sentence is actually searching: mentioning a day is not asking
-    about one.
+    about one. Unless someone turned to the device and asked, in which case the
+    searching is not in doubt.
     """
-    if not _is_searching(query):
+    if not asked and not _is_searching(query):
         return set()
     lowered = _fold(query)
     return {kind for kind, cues in _KIND_CUES.items() if any(c in lowered for c in cues)}
@@ -213,14 +214,22 @@ class Memory:
 
     # -- recall ----------------------------------------------------------------
 
-    def recall(self, query: str, limit: int = 5) -> list[Recollection]:
+    def recall(self, query: str, limit: int = 5,
+               asked: bool = False) -> list[Recollection]:
         """Find what is relevant to what is being said now.
 
         Scored on token overlap with a mild preference for recent things, because in
         conversation the recent past is usually what is being reached for.
+
+        Args:
+            asked: Whether this came from someone deliberately turning to the device. A
+                sentence overheard needs to look like a search before a category cue
+                counts; a question put to it directly IS the search, and the words that
+                would have proved it are exactly the ones stripped on the way here —
+                "adamın adı neydi ya" arrives as "adamın adı" and recalled nothing.
         """
         wanted = _tokens(query)
-        sought = _sought_kinds(query)
+        sought = _sought_kinds(query, asked=asked)
         if (not wanted and not sought) or not self.items:
             return []
 
@@ -251,10 +260,10 @@ class Memory:
         scored.sort(key=lambda pair: pair[0], reverse=True)
         return [item for _, item in scored[:limit]]
 
-    def render(self, query: str, limit: int = 5) -> str:
+    def render(self, query: str, limit: int = 5, asked: bool = False) -> str:
         """What to put in front of the judge. Empty when nothing is relevant, so the
         judge is told plainly that it knows nothing rather than left to fill the gap."""
-        found = self.recall(query, limit)
+        found = self.recall(query, limit, asked=asked)
         if not found:
             return ""
         return "\n".join(f"- [{i.kind}] {i.text}" for i in found)

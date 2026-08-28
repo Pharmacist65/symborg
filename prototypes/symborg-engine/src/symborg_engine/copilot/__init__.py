@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .extract import extract
 from .judge import Judgement, decide, judge_moment
+from .addressed import Address, Wants, answer, understand
 from .contradiction import Mismatch, check
 from .look import Sighting, look
 from .memory import KINDS, Memory, Recollection
@@ -22,5 +23,6 @@ __all__ = [
     "Translator", "Rendering",
     "Channel", "Situation", "Delivery", "Held", "route",
     "Sighting", "look",
+    "Address", "Wants", "understand", "answer",
     "MIN_GAP_S", "MAX_PER_MINUTE", "DEFAULT_THRESHOLD",
 ]

@@ -12,16 +12,19 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from ..context.transcript import Transcript
 from ..providers import resolve_language_model, resolve_synthesiser
 from ..providers.base import LanguageModel, Synthesiser, Utterance, VoiceRef
 from ..turntaking import TurnMonitor
+from .addressed import Address, Wants, answer, understand
 from .extract import extract
 from .judge import decide
+from .look import look
 from .memory import Memory, Recollection
-from .output import Channel, Delivery, Situation, route
+from .output import (MAX_WHISPER_WORDS, Channel, Delivery, Held, Situation,
+                     route)
 from .salience import Moment, Reason, SalienceGate, Verdict
 
 __all__ = ["Copilot", "Heard"]
@@ -44,6 +47,9 @@ class Heard:
     remembered: tuple[str, ...] = field(default=(), kw_only=True)
     utterance: Utterance | None = field(default=None, kw_only=True)
     delivery: Delivery | None = field(default=None, kw_only=True)
+    address: Address | None = field(default=None, kw_only=True)
+    """Set when the person turned to it rather than talked near it."""
+    sighting: dict | None = field(default=None, kw_only=True)
     latency_ms: int = field(default=0, kw_only=True)
 
     def __post_init__(self) -> None:
@@ -58,6 +64,8 @@ class Heard:
         return {"transcript": self.transcript, "said": self.said,
                 "remembered": list(self.remembered), "latency_ms": self.latency_ms,
                 "delivery": self.delivery.to_dict() if self.delivery else None,
+                "address": self.address.to_dict() if self.address else None,
+                "sighting": self.sighting,
                 **self.verdict.to_dict()}
 
 
@@ -108,9 +116,103 @@ class Copilot:
         self.monitor.observe(text, cumulative=cumulative)
 
     def address(self) -> None:
-        """The person spoke to it directly. Suspends the timing gates for this turn,
-        not the judgement — being asked is not a reason to say something empty."""
+        """The next turn is meant for it. Set by a wake word or a button press."""
         self._asked = True
+
+    # -- being spoken to -------------------------------------------------------
+
+    def asked(self, said: str, image: bytes | None = None,
+              translator=None) -> Heard:
+        """The person turned to it and said something.
+
+        The exact inverse of :meth:`turn_ended`. There, silence is the default and
+        speaking must be justified; here someone deliberately addressed the device, so
+        saying nothing is the failure. The salience gate does not apply, the rate limit
+        does not apply, and mute does not apply — mute is this person\'s own instruction
+        and so is talking to it, and the later one wins.
+
+        Args:
+            said: What they said to it.
+            image: A frame from the camera, when there is one. A request to look at
+                something comes back with ``needs_camera`` set and no answer until one
+                arrives; nothing is invented about a picture that was never taken.
+            translator: Used only for translation requests. Optional so the ordinary
+                paths cost nothing.
+
+        Returns:
+            What happened, always with something said.
+        """
+        started = _now_ms()
+        text = " ".join(said.split())
+        self._asked = False
+        self.monitor.reset()
+        if not text:
+            return self._record(Heard("", Verdict.silent(Reason.NOTHING_NOTABLE)))
+
+        self.transcript.add_text(text, speaker="user")
+        request = understand(self.model, text)
+
+        if request.want is Wants.LOOK and image is None:
+            # Nothing to answer from yet. Saying so is the answer.
+            return self._deliver(text, request, "Telefonu ona doğru tut.",
+                                 started, perishable=True)
+
+        if request.want is Wants.LOOK:
+            sighting = look(self.model, image, request.query or "Bu ne?")
+            spoken = sighting.whisper or sighting.seen or "Göremedim."
+            return self._deliver(text, request, spoken, started,
+                                 sighting=sighting.to_dict())
+
+        if request.want is Wants.TRANSLATE:
+            if translator is None:
+                return self._deliver(text, request, "Çeviri şu an kapalı.", started)
+            rendering = translator.outgoing(request.query or text, speak=False)
+            return self._deliver(text, request,
+                                 rendering.text or "Çeviremedim.", started)
+
+        if request.want is Wants.REMEMBER:
+            # Deliberate. A person saying "bunu unutma" outranks any confidence score,
+            # so this goes in whole rather than through the extractor\'s judgement.
+            self.memory.keep(Recollection(request.query or text, kind="fact",
+                                          source=text, confidence=1.0))
+            return self._deliver(text, request, "Tamam, aklımda.", started)
+
+        if request.want is Wants.FORGET:
+            removed = self.memory.forget(lambda item: True) if _is_total(request.query) \
+                else self.memory.forget(
+                    lambda item: bool(_tokens_of(request.query) & item.tokens))
+            spoken = "Sildim." if removed else "Öyle bir şey yok zaten."
+            return self._deliver(text, request, spoken, started)
+
+        if request.want is Wants.UNCLEAR:
+            return self._deliver(text, request, request.say_if_unclear, started)
+
+        known = self.memory.render(request.query or text, asked=True)
+        return self._deliver(text, request, answer(self.model, request.query or text,
+                                                   known), started)
+
+    def _deliver(self, text: str, request: Address, spoken: str, started: int,
+                 sighting: dict | None = None, perishable: bool = False) -> Heard:
+        """Say it. Being addressed suspends the gate, not the routing: a private channel
+        is still chosen over a loudspeaker in a room full of people."""
+        situation = self.situation
+        if situation.user_speaking:
+            # They just finished asking, so this flag is stale rather than true.
+            situation = replace(situation, user_speaking=False)
+        delivery = route(spoken, situation, perishable=perishable)
+        if not delivery.delivered and delivery.held is Held.TOO_LONG:
+            spoken = " ".join(spoken.split()[:MAX_WHISPER_WORDS])
+            delivery = route(spoken, situation, perishable=perishable)
+
+        utterance = None
+        if delivery.channel in (Channel.EAR, Channel.ROOM):
+            utterance = self.synthesiser.synthesise(delivery.text, self.voice)
+        self.gate.spoke(self.clock())
+        return self._record(Heard(
+            text, Verdict.worth_it(1.0), said=delivery.text or spoken,
+            utterance=utterance, delivery=delivery, address=request,
+            sighting=sighting, latency_ms=_now_ms() - started,
+        ))
 
     # -- the decision ----------------------------------------------------------
 
@@ -209,3 +311,18 @@ class Copilot:
     def _record(self, heard: Heard) -> Heard:
         self._log.append(heard)
         return heard
+
+
+_TOTAL = ("hepsini", "her şeyi", "hiçbir şey", "tamamen", "tümünü", "bütün")
+
+
+def _is_total(query: str) -> bool:
+    """Whether a request to forget means everything. Erasing more than was asked is the
+    worse mistake, so this stays narrow and deliberate."""
+    lowered = query.replace("İ", "i").replace("I", "ı").lower()
+    return any(word in lowered for word in _TOTAL)
+
+
+def _tokens_of(query: str) -> set:
+    from .memory import _tokens
+    return _tokens(query)

@@ -1,0 +1,26 @@
+{"said": "Şu adamın adı neydi ya?", "want": "answer", "tag": "hafiza"}
+{"said": "Toplantı ne zamandı?", "want": "answer", "tag": "hafiza"}
+{"said": "Bütçe ne kadardı?", "want": "answer", "tag": "hafiza"}
+{"said": "Kızımın doğum günü ne zamandı?", "want": "answer", "tag": "hafiza"}
+{"said": "Ne demiştim ben ona?", "want": "answer", "tag": "hafiza"}
+{"said": "Hangi firmadaydı o adam?", "want": "answer", "tag": "hafiza"}
+{"said": "Sunum kaç sayfaydı?", "want": "answer", "tag": "hafiza"}
+{"said": "Bak şuna, bu ne?", "want": "look", "tag": "kamera"}
+{"said": "Şuna bir bakar mısın?", "want": "look", "tag": "kamera"}
+{"said": "Bu mantar ne, yiyebilir miyim?", "want": "look", "tag": "kamera"}
+{"said": "Şuradaki tabelada ne yazıyor?", "want": "look", "tag": "kamera"}
+{"said": "Bunu tanıyor musun?", "want": "look", "tag": "kamera"}
+{"said": "Baksana şuna, ilaç kutusu bu galiba.", "want": "look", "tag": "kamera"}
+{"said": "Bunu İngilizce nasıl derim: hesabı alabilir miyiz", "want": "translate", "query_is": "hesabı alabilir miyiz", "tag": "ceviri"}
+{"said": "Şunu çevir: biraz pahalı geldi", "want": "translate", "query_is": "biraz pahalı geldi", "tag": "ceviri"}
+{"said": "İngilizcesi ne bunun: yarın dokuzda buluşalım", "want": "translate", "query_is": "yarın dokuzda buluşalım", "tag": "ceviri"}
+{"said": "Ne dedi bu adam?", "want": "translate", "tag": "ceviri"}
+{"said": "Almancaya çevir: teşekkür ederim", "want": "translate", "query_is": "teşekkür ederim", "tag": "ceviri"}
+{"said": "Kızımın doğum günü 12 Mart, bunu unutma.", "want": "remember", "tag": "sakla"}
+{"said": "Not al: pazartesi eczaneye uğrayacağım.", "want": "remember", "tag": "sakla"}
+{"said": "Aklında tut, Kerem'i cuma arayacağım.", "want": "remember", "tag": "sakla"}
+{"said": "Bunu unut.", "want": "forget", "tag": "sil"}
+{"said": "Sil şunu, yanlış söyledim.", "want": "forget", "tag": "sil"}
+{"said": "Her şeyi unut, hiçbir şey hatırlama.", "want": "forget", "tag": "sil"}
+{"said": "Hımm şey ya işte.", "want": "unclear", "tag": "anlasilmaz"}
+{"said": "Ee.", "want": "unclear", "tag": "anlasilmaz"}
