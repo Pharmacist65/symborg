@@ -311,14 +311,25 @@ def _listen(state: CopilotState, bus: Broadcaster, audio: dict, language: str) -
 
     stream = RealtimeTranscriptStream(state.source.blocks(), language=language)
     for fragment in stream:
+        # The text lives in the partials. The fragment that closes a turn carries the
+        # end of the utterance and not its words — reading that one and calling it the
+        # turn means every turn arrives empty, and the whole thing looks deaf while the
+        # transcription is in fact perfect.
+        if fragment.text.strip():
+            state.copilot.hear_partial(fragment.text, cumulative=fragment.cumulative)
         if not fragment.is_final:
-            state.heard = fragment.text
+            state.heard = state.copilot.monitor.partial
             bus.publish(state.snapshot())
+            continue
+
+        said = state.copilot.monitor.partial.strip()
+        if not said:
+            state.copilot.monitor.reset()
             continue
 
         if state.addressing:
             state.addressing = False
-            heard = state.copilot.asked(fragment.text, translator=state.translator)
+            heard = state.copilot.asked(said, translator=state.translator)
             state.asked_count += 1
             state.heard = ""
             entry = _entry(heard, audio)
@@ -327,7 +338,7 @@ def _listen(state: CopilotState, bus: Broadcaster, audio: dict, language: str) -
             bus.publish(state.snapshot())
             continue
 
-        heard = state.copilot.turn_ended(fragment.text)
+        heard = state.copilot.turn_ended(said)
         state.turns += 1
         state.heard = ""
         entry = _entry(heard, audio)

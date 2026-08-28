@@ -36,6 +36,9 @@ speaker is still talking, which is the one property the whole design depends on.
 alternatives that do support server-side turn detection returned nothing until the
 buffer was committed, which would be useless here."""
 
+MIN_COMMIT_BYTES = 4_800
+"""100 ms of 24 kHz mono PCM16 — the least the endpoint will accept in a commit."""
+
 TURN_GAP_MS = 1_400
 """Silence, measured as a gap between deltas, that ends a turn.
 
@@ -129,6 +132,12 @@ class RealtimeTranscriptStream:
         self._turn_gap_ms = turn_gap_ms
         self._api_key = api_key
         self._drain_s = drain_s
+        self._uncommitted = 0
+        """Bytes appended since the last commit. The endpoint refuses a commit with less
+        than 100 ms in the buffer, and once audio is gated for silence it arrives in
+        bursts — so a commit can easily follow another with nothing in between. Swallowing
+        the exception does not help: the server reports it asynchronously, and it surfaces
+        as a stream error several seconds later, a long way from its cause."""
         self._out: queue.Queue = queue.Queue()
         self._thread: threading.Thread | None = None
         self._error: BaseException | None = None
@@ -217,13 +226,26 @@ class RealtimeTranscriptStream:
             if block is None:
                 # The source is exhausted. Commit whatever is buffered so the last turn
                 # is transcribed, then give the server a moment to send it.
-                try:
-                    await conn.input_audio_buffer.commit()
-                except Exception:
-                    pass
+                await self._commit(conn)
                 await asyncio.sleep(self._drain_s)
                 return
             await conn.input_audio_buffer.append(audio=base64.b64encode(block).decode())
+            self._uncommitted += len(block)
+
+    async def _commit(self, conn) -> bool:
+        """Close the buffer, unless there is not enough in it to close.
+
+        Returns:
+            Whether the connection is still usable.
+        """
+        if self._uncommitted < MIN_COMMIT_BYTES:
+            return True          # nothing new to close; not an error
+        self._uncommitted = 0
+        try:
+            await conn.input_audio_buffer.commit()
+        except Exception:
+            return False
+        return True
 
     async def _consume(self, conn) -> None:
         """Translate server events into fragments, and close turns on silence.
@@ -278,7 +300,5 @@ class RealtimeTranscriptStream:
                 continue
             if (time.monotonic() - self._last_delta) * 1000 >= self._turn_gap_ms:
                 self._last_delta = None
-                try:
-                    await conn.input_audio_buffer.commit()
-                except Exception:
+                if not await self._commit(conn):
                     return
