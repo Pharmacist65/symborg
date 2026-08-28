@@ -20,8 +20,9 @@ from pathlib import Path
 from symborg_engine.copilot import Copilot, Memory, Recollection, Situation
 from symborg_engine.providers.browser_audio import BrowserSource
 from symborg_engine.providers.offline import OfflineLanguageModel, OfflineSynthesiser
-from symborg_engine.ui.copilot_server import (BLOCK_LIMIT, PHOTO_LIMIT, STATIC,
-                                              CopilotState, _certificate, _handler)
+from symborg_engine.ui.copilot_server import (ADDRESS_WINDOW_S, BLOCK_LIMIT,
+                                              PHOTO_LIMIT, STATIC, CopilotState,
+                                              _certificate, _handler)
 from symborg_engine.ui.server import Broadcaster, QuietServer
 
 
@@ -368,3 +369,31 @@ class TestThePageCarriesItsOwnParts(unittest.TestCase):
         page = (STATIC / "copilot.html").read_text(encoding="utf-8")
         for path in ("/vad.js", "/capture.js", "/manifest.json"):
             self.assertIn(path, page)
+
+
+class TestThePressToTalkWindowCloses(unittest.TestCase):
+    """An accidental press that is never followed by speech would otherwise stay armed
+    indefinitely, and the next thing anyone in the room said would be treated as
+    addressed to the device."""
+
+    PORT = 8752
+
+    def test_pressing_arms_it(self):
+        with _Served(_copilot(), self.PORT) as served:
+            served.request("POST", "/address", body=b"{}")
+            self.assertTrue(served.state.addressing)
+
+    def test_it_disarms_on_its_own(self):
+        with _Served(_copilot(), self.PORT + 1) as served:
+            served.request("POST", "/address", body=b"{}")
+            served.state.addressing_until = time.monotonic() - 0.01
+            self.assertFalse(served.state.addressing)
+
+    def test_it_starts_disarmed(self):
+        with _Served(_copilot(), self.PORT + 2) as served:
+            self.assertFalse(served.state.addressing)
+
+    def test_the_window_is_long_enough_to_gather_a_thought(self):
+        """People do not start talking the instant they press a button."""
+        self.assertGreaterEqual(ADDRESS_WINDOW_S, 5.0)
+        self.assertLessEqual(ADDRESS_WINDOW_S, 30.0)

@@ -53,6 +53,12 @@ STATIC_FILES = {
 }
 DEFAULT_PORT = 8771
 DEFAULT_TLS_DIR = "~/.symborg/tls"
+ADDRESS_WINDOW_S = 12.0
+"""How long a press-to-talk stays armed with nothing said.
+
+Long enough to press, gather a thought and speak — people do not start talking the
+instant they press a button — and short enough that a pocket press does not quietly
+capture whatever the room says next."""
 BLOCK_LIMIT = 1 << 20      # a page sending more than a megabyte at once is not audio
 PHOTO_LIMIT = 1 << 23      # a photograph, base64-encoded, with room to spare
 HARD_LIMIT = 1 << 24       # past this, the connection is not worth saving
@@ -70,10 +76,18 @@ class CopilotState:
     turns: int = 0
     spoke: int = 0
     asked_count: int = 0
-    addressing: bool = False
-    """The next turn is meant for it. Set by the page's press-to-talk, and it stays set
-    until that turn actually closes — the person releases the button before the words
-    have finished arriving."""
+    addressing_until: float = 0.0
+    """When the press-to-talk window closes.
+
+    A window rather than a flag. The button is pressed and then the person speaks, so it
+    has to outlast the release — but an accidental press that is never followed by speech
+    would otherwise stay armed indefinitely, and the next thing anyone in the room said
+    would be treated as addressed to the device.
+    """
+
+    @property
+    def addressing(self) -> bool:
+        return time.monotonic() < self.addressing_until
     log: list[dict] = field(default_factory=list)
 
     def snapshot(self) -> dict:
@@ -271,7 +285,7 @@ def _handler(state: CopilotState, bus: Broadcaster, audio: dict):
                 # Press-to-talk. The audio keeps flowing through the same stream; this
                 # only marks which turn was meant for it, which is also how an earpiece
                 # button would behave.
-                state.addressing = True
+                state.addressing_until = time.monotonic() + ADDRESS_WINDOW_S
                 bus.publish(state.snapshot())
                 self._json({"ok": True})
             elif self.path == "/asked":
@@ -382,7 +396,7 @@ def _listen(state: CopilotState, bus: Broadcaster, audio: dict, language: str) -
             continue
 
         if state.addressing:
-            state.addressing = False
+            state.addressing_until = 0.0
             heard = state.copilot.asked(said, translator=state.translator)
             state.asked_count += 1
             state.heard = ""
