@@ -10,6 +10,8 @@ places. "Ne demişti adamın adı" is memory. "Bak şuna" needs the camera and c
 answered until a frame arrives. "Bunu İngilizce nasıl derim" is the translator. Getting
 this wrong is not dangerous, only useless — but useless twice and nobody addresses it a
 third time.
+
+Near tier: six categories from one short sentence, on every press of the button.
 """
 
 from __future__ import annotations
@@ -188,6 +190,7 @@ def understand(model: LanguageModel, said: str) -> Address:
         max_tokens=200,
         temperature=0.0,
         json_schema=ADDRESS_SCHEMA,
+        tier="near",
     )
     try:
         raw = model.complete(prompt)
@@ -278,6 +281,7 @@ def answer(model: LanguageModel, question: str, known: str) -> str:
         max_tokens=160,
         temperature=0.1,
         json_schema=ANSWER_SCHEMA,
+        tier="near",
     )
     try:
         raw = model.complete(prompt)

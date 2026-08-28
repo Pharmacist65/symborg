@@ -41,6 +41,14 @@ class Prompt:
     max_tokens: int = 512
     temperature: float = 0.4
     stop: tuple[str, ...] = field(default_factory=tuple)
+    tier: str = "far"
+    """Which tier this belongs to: ``"near"`` for the constant shallow work that could run
+    on the device, ``"far"`` for the rare deep questions worth sending away.
+
+    A plain string rather than the enum so :mod:`base` keeps its stdlib-only imports and
+    a provider that has never heard of tiers still receives a valid prompt.
+    """
+
     image: bytes | None = None
     """Optional image the question is about, as encoded bytes (PNG or JPEG).
 

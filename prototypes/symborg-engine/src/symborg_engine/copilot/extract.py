@@ -7,6 +7,10 @@ keeping the wrong things produces a device that confidently misremembers.
 So this is asked in the negative, like the salience judge: assume nothing here needs
 keeping, and justify each exception. The test is whether someone might reach for it
 later and not find it in their own head.
+
+Near tier: this runs on every turn of every conversation, all day. Sifting what is
+worth keeping is shallow work whose cost is entirely in how often it happens, and getting
+it wrong loses one fact rather than saying something wrong out loud.
 """
 
 from __future__ import annotations
@@ -114,6 +118,7 @@ def extract(model: LanguageModel, transcript: str) -> list[Recollection]:
         max_tokens=300,
         temperature=0.1,
         json_schema=EXTRACT_SCHEMA,
+        tier="near",
     )
     try:
         raw = model.complete(prompt)

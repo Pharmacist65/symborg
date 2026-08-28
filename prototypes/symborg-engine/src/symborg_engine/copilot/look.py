@@ -12,6 +12,8 @@ by. That is not hedging: it is the true shape of what a picture can tell you.
 
 Nothing here is medical. It is about the limits of identification from an image, which
 apply the same to a mushroom, a snake, a plug socket and a road sign.
+
+Far tier: a photograph the person is about to act on.
 """
 
 from __future__ import annotations
@@ -135,6 +137,7 @@ def look(model: LanguageModel, image: bytes, question: str = "Bu ne?",
         max_tokens=600,
         temperature=0.1,
         json_schema=LOOK_SCHEMA,
+        tier="far",
     )
     try:
         raw = model.complete(prompt)

@@ -179,6 +179,10 @@ function render_stats(s) {
   const lines = [];
   if (s.turns) lines.push(`${s.turns} tur · ${Math.round(s.silence * 100)}% sessiz`);
   if (s.remembered) lines.push(`${s.remembered} kayıt`);
+  // What could have stayed on the device. The number that decides whether a local model
+  // is worth having, shown while it is being earned rather than estimated afterwards.
+  if (s.tiers?.near_calls || s.tiers?.far_calls)
+    lines.push(`${Math.round(s.tiers.near_share * 100)}% yakın · ${s.tiers.far_calls} uzak`);
   stats.innerHTML = (running ? `<b>${Math.round(passed * 100)}% ses gitti</b>` : '')
     + lines.join(' · ');
 }

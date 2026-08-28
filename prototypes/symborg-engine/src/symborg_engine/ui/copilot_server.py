@@ -34,7 +34,9 @@ from pathlib import Path
 from ..copilot import Copilot, Memory, Situation
 from ..copilot.look import look
 from ..copilot.translate import Translator
+from ..providers import resolve_language_model
 from ..providers.browser_audio import SAMPLE_RATE, BrowserSource
+from ..providers.router import TieredModel
 from ..tls import ensure_trust_store
 from .server import Broadcaster, QuietServer
 
@@ -98,6 +100,8 @@ class CopilotState:
             "spoke": self.spoke,
             "silence": round(self.copilot.silence_rate, 3),
             "asked": self.asked_count,
+            "tiers": (self.copilot.model.ledger.to_dict()
+                      if hasattr(self.copilot.model, "ledger") else None),
             "addressing": self.addressing,
             "remembered": len(self.copilot.memory.items),
             "situation": {
@@ -482,7 +486,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     ensure_trust_store()
-    copilot = Copilot(memory=Memory.open(args.memory),
+    # Wrapped in the router even with one model behind both tiers, so the split between
+    # what could run on the device and what has to be sent away is visible on a real day
+    # rather than argued about.
+    model = TieredModel(far=resolve_language_model(None),
+                        near=resolve_language_model(None))
+    copilot = Copilot(model=model, memory=Memory.open(args.memory),
                       situation=Situation(earpiece=True, screen_visible=True,
                                           others_present=True))
     print(f"\n  sample rate {SAMPLE_RATE} Hz   language {args.language}")

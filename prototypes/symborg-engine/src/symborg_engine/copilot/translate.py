@@ -17,6 +17,8 @@ original. Outbound — what this person wants to say — is spoken aloud in a ro
 someone who cannot check it, so it stays close to their words and never improves on
 them. Putting a sentence in someone's mouth that they did not intend is the failure
 this direction has to avoid, and politeness is not worth it.
+
+Far tier: read aloud to a stranger on the person's behalf. Quality is the product.
 """
 
 from __future__ import annotations
@@ -141,6 +143,7 @@ class Translator:
             max_tokens=400,
             temperature=0.1,      # a translation should not vary between runs
             json_schema=TRANSLATE_SCHEMA,
+            tier="far",
         )
         try:
             raw = self.model.complete(prompt)

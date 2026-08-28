@@ -7,6 +7,9 @@ almost nothing in an ordinary conversation does.
 The model is asked the question in the negative: assume silence, and justify departing
 from it. Asked the other way round a language model will always find something helpful
 to say, which is exactly the failure that emptied this product category.
+
+Near tier: it runs on every turn that clears the cheap gates. Its default answer is
+silence, so a small model being unsure produces the behaviour we want anyway.
 """
 
 from __future__ import annotations
@@ -162,6 +165,7 @@ def judge_moment(model: LanguageModel, transcript: str, memory: str = "",
         max_tokens=160,
         temperature=0.2,          # this is a judgement, not a creative act
         json_schema=JUDGE_SCHEMA,
+        tier="near",
     )
 
     try:

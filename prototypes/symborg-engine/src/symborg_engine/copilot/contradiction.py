@@ -9,6 +9,9 @@ of them is a reason to let someone walk away with the wrong date.
 So this asks one question only, in a vocabulary that has no room for politeness: are
 these two the same thing or not. The judgement about whether to speak stays where it
 belongs, but it no longer gets to overrule arithmetic.
+
+Far tier: rare, and the output is spoken into someone's ear as a correction. A wrong
+figure delivered confidently is worse than no device at all.
 """
 
 from __future__ import annotations
@@ -102,6 +105,7 @@ def check(model: LanguageModel, said: str, known: str) -> Mismatch:
         max_tokens=120,
         temperature=0.0,          # a comparison should not vary between runs
         json_schema=CHECK_SCHEMA,
+        tier="far",
     )
     try:
         raw = model.complete(prompt)
