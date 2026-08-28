@@ -7,6 +7,7 @@ it. These cover the plumbing that makes the phone reachable at all.
 
 from __future__ import annotations
 
+import base64
 import http.client
 import json
 import threading
@@ -16,7 +17,8 @@ import unittest
 from symborg_engine.copilot import Copilot, Memory, Recollection, Situation
 from symborg_engine.providers.browser_audio import BrowserSource
 from symborg_engine.providers.offline import OfflineLanguageModel, OfflineSynthesiser
-from symborg_engine.ui.copilot_server import BLOCK_LIMIT, CopilotState, _handler
+from symborg_engine.ui.copilot_server import (BLOCK_LIMIT, PHOTO_LIMIT,
+                                              CopilotState, _handler)
 from symborg_engine.ui.server import Broadcaster, QuietServer
 
 
@@ -90,6 +92,18 @@ class _Served:
             return response.status, response.read()
         finally:
             conn.close()
+
+
+class _LooksAt:
+    """A model that records the picture it was shown."""
+
+    def __init__(self, reply: str) -> None:
+        self.reply = reply
+        self.seen: bytes | None = None
+
+    def complete(self, prompt) -> str:
+        self.seen = prompt.image
+        return self.reply
 
 
 def _copilot(**kw) -> Copilot:
@@ -176,3 +190,53 @@ class TestTheServer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTheCamera(unittest.TestCase):
+    """The photograph route. The safety rule lives in copilot.look; these cover the
+    plumbing that carries a picture to it."""
+
+    PORT = 8782
+
+    def test_a_photograph_produces_a_sighting(self):
+        model = _LooksAt(json.dumps({
+            "seen": "kahverengi mantar", "could_be": ["agarik"], "missing": "lamel",
+            "confidence": 0.4, "irreversible": True,
+            "whisper": "Fotoğraftan emin olunmaz."}, ensure_ascii=False))
+        copilot = Copilot(model=model, synthesiser=OfflineSynthesiser(),
+                          memory=Memory(), situation=Situation(earpiece=True))
+        with _Served(copilot, self.PORT) as served:
+            status, body = served.request(
+                "POST", "/look",
+                body=json.dumps({"image": base64.b64encode(b"jpegbytes").decode(),
+                                 "question": "Bunu yiyebilir miyim?"}).encode())
+            self.assertEqual(status, 200)
+            self.assertTrue(json.loads(body)["irreversible"])
+            self.assertEqual(model.seen, b"jpegbytes")
+
+    def test_a_sighting_reaches_the_page(self):
+        model = _LooksAt(json.dumps({
+            "seen": "bir şey", "could_be": [], "missing": "", "confidence": 0.3,
+            "irreversible": False, "whisper": "Bir şey."}, ensure_ascii=False))
+        copilot = Copilot(model=model, synthesiser=OfflineSynthesiser(), memory=Memory())
+        with _Served(copilot, self.PORT + 1) as served:
+            served.request("POST", "/look",
+                           body=json.dumps({"image": base64.b64encode(b"x").decode()}).encode())
+            self.assertIn("sighting", served.state.log[-1])
+
+    def test_bad_base64_is_rejected(self):
+        with _Served(_copilot(), self.PORT + 2) as served:
+            status, _ = served.request("POST", "/look",
+                                       body=json.dumps({"image": "!!!"}).encode())
+            self.assertEqual(status, 400)
+
+    def test_a_missing_image_is_rejected(self):
+        with _Served(_copilot(), self.PORT + 3) as served:
+            status, body = served.request("POST", "/look", body=b"{}")
+            self.assertEqual(status, 400)
+            self.assertEqual(json.loads(body)["error"], "no_image")
+
+    def test_a_photograph_may_be_larger_than_an_audio_block(self):
+        """A block of audio and a photograph are different sizes, and one limit for
+        both would reject either the picture or nothing at all."""
+        self.assertGreater(PHOTO_LIMIT, BLOCK_LIMIT)

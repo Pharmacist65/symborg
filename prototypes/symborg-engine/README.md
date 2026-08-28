@@ -76,6 +76,25 @@ PYTHONPATH=src python3 -m symborg_engine.ui.copilot_server --cert cert.pem --key
 The phone will warn once that the certificate is self-signed, which it is. `*.pem` is
 gitignored: the pair you generate is yours alone.
 
+The page also has a camera. Point it at something and ask, and it answers what it can
+see rather than the question you asked:
+
+> **Bunu yiyebilir miyim?**
+> Fotoğraftan yiyip yiyemeyeceğini söyleyemem; benzerleri çok tehlikeli — uzmana danış.
+> *gördüğü:* kahverengi şapkalı, beyaz saplı bir mantar
+> *olabilir:* şapkalı bir agarik · zehirli bir benzeri
+> *fotoğrafta olmayan:* lamel rengi, kesit, koku, hangi ağacın altında bittiği
+
+An identification model that is eighty per cent sure will say "edible", and eighty per
+cent is a coin flip taken with your life a few times a year. So the words that grant
+permission — yenir, güvenli, zararsız, edible — are refused in the prompt *and* replaced
+in code if the model says them anyway: a prompt is a request, and this needs to be a
+promise. Asking as a mycologist, asking in a hurry, and asking for "just a yes" all get
+the same answer.
+
+Nothing about this is medical. It is the limit of what a photograph can settle, and it
+applies the same to a mushroom, a snake, a plug socket and a road sign.
+
 The page has three switches — earpiece, someone with me, screen visible — because the
 routing depends on them and only the person knows. They are why the same sentence goes
 to the ear in one room and nowhere in another.

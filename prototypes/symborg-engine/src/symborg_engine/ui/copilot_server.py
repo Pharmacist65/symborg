@@ -16,6 +16,8 @@ a self-signed pair if you have none.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import json
 import queue
 import socket
@@ -28,6 +30,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 from ..copilot import Copilot, Memory, Situation
+from ..copilot.look import look
 from ..providers.browser_audio import SAMPLE_RATE, BrowserSource
 from ..tls import ensure_trust_store
 from .server import Broadcaster, QuietServer
@@ -37,6 +40,7 @@ __all__ = ["CopilotState", "serve", "main"]
 STATIC = Path(__file__).parent / "static"
 DEFAULT_PORT = 8771
 BLOCK_LIMIT = 1 << 20      # a page sending more than a megabyte at once is not audio
+PHOTO_LIMIT = 1 << 23      # a photograph, base64-encoded, with room to spare
 HARD_LIMIT = 1 << 24       # past this, the connection is not worth saving
 
 
@@ -136,7 +140,8 @@ def _handler(state: CopilotState, bus: Broadcaster, audio: dict):
 
         def do_POST(self) -> None:
             length = int(self.headers.get("Content-Length", 0))
-            if length > BLOCK_LIMIT:
+            limit = PHOTO_LIMIT if self.path == "/look" else BLOCK_LIMIT
+            if length > limit:
                 # Discard it rather than refusing to read. Answering mid-body closes
                 # the socket while the page is still writing, which the page sees as a
                 # broken connection rather than a rejection — and the page posts audio
@@ -145,7 +150,7 @@ def _handler(state: CopilotState, bus: Broadcaster, audio: dict):
                 # alive; past the hard cap the connection really is finished.
                 if not self._discard(length, HARD_LIMIT):
                     self.close_connection = True
-                self._json({"error": "too_large", "limit": BLOCK_LIMIT}, 413)
+                self._json({"error": "too_large", "limit": limit}, 413)
                 return
             body = self.rfile.read(length) if length else b""
 
@@ -173,6 +178,33 @@ def _handler(state: CopilotState, bus: Broadcaster, audio: dict):
                 )
                 bus.publish(state.snapshot())
                 self._json({"ok": True})
+            elif self.path == "/look":
+                try:
+                    payload = json.loads(body or b"{}")
+                    image = base64.b64decode(payload.get("image", ""), validate=True)
+                except (json.JSONDecodeError, ValueError, binascii.Error):
+                    self._json({"error": "bad_request"}, 400)
+                    return
+                if not image:
+                    self._json({"error": "no_image"}, 400)
+                    return
+                sighting = look(state.copilot.model, image,
+                                str(payload.get("question", "Bu ne?")),
+                                mime=str(payload.get("mime", "image/jpeg")))
+                entry = {
+                    "at": time.strftime("%H:%M"),
+                    "transcript": str(payload.get("question", "Bu ne?")),
+                    "said": sighting.whisper,
+                    "channel": "screen",
+                    "held": None,
+                    "remembered": [],
+                    "latency_ms": 0,
+                    "audio": None,
+                    "sighting": sighting.to_dict(),
+                }
+                state.log.append(entry)
+                bus.publish(state.snapshot())
+                self._json(sighting.to_dict())
             elif self.path == "/forget":
                 removed = state.copilot.memory.forget_all()
                 bus.publish(state.snapshot())

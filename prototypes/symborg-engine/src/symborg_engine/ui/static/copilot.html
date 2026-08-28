@@ -61,6 +61,19 @@
   }
   #toggles button.on { color: var(--fg); border-color: var(--dim); }
   #note { margin-top: 11px; font-size: 12px; color: var(--held); text-align: center; }
+  #camera { display: none; }
+  #shoot {
+    width: 100%; margin-top: 8px; padding: 15px; font: inherit; font-size: 15px;
+    border-radius: 12px; border: 1px solid var(--line); background: transparent;
+    color: var(--fg);
+  }
+  .sighting { margin-top: 9px; font-size: 14px; color: var(--dim); }
+  .sighting ul { margin: 6px 0 0; padding-left: 18px; }
+  .sighting li { margin: 2px 0; }
+  .warn {
+    margin-top: 9px; padding: 11px 14px; border-radius: 12px; font-size: 16px;
+    background: rgba(251,191,36,.08); border-left: 3px solid var(--room);
+  }
 </style>
 
 <header>
@@ -85,6 +98,8 @@
     <button data-key="others_present">yanımda biri var</button>
     <button data-key="screen_visible">ekran görünür</button>
   </div>
+  <button id="shoot">Bir şeye bak</button>
+  <input type="file" id="camera" accept="image/*" capture="environment">
   <div id="note"></div>
 </footer>
 
@@ -95,6 +110,7 @@ const hearing = document.getElementById('hearing'), turns = document.getElementB
 const empty = document.getElementById('empty'), start = document.getElementById('start');
 const note = document.getElementById('note');
 let ctx, node, media, pending = [], running = false, seen = 0, situation = {};
+const shoot = document.getElementById('shoot'), camera = document.getElementById('camera');
 
 const TAG = { ear: 'kulağa', screen: 'ekranda', room: 'sesli' };
 
@@ -135,6 +151,31 @@ function render(entry) {
     el.append(h);
   }
 
+  if (entry.sighting) {
+    const g = entry.sighting;
+    const box = document.createElement('div');
+    box.className = g.irreversible ? 'warn' : 'sighting';
+    box.textContent = g.whisper || g.seen;
+    el.append(box);
+    const detail = document.createElement('div');
+    detail.className = 'sighting';
+    detail.textContent = g.seen;
+    if (g.could_be && g.could_be.length) {
+      const ul = document.createElement('ul');
+      for (const c of g.could_be) {
+        const li = document.createElement('li'); li.textContent = c; ul.append(li);
+      }
+      detail.append(ul);
+    }
+    if (g.missing) {
+      const m = document.createElement('div');
+      m.style.marginTop = '6px';
+      m.textContent = 'fotoğrafta olmayan: ' + g.missing;
+      detail.append(m);
+    }
+    el.append(detail);
+  }
+
   if (entry.remembered && entry.remembered.length) {
     const k = document.createElement('div');
     k.className = 'kept';
@@ -156,6 +197,32 @@ for (const b of document.querySelectorAll('#toggles button')) {
       body: JSON.stringify({ [b.dataset.key]: next }) });
   };
 }
+
+shoot.onclick = () => camera.click();
+
+camera.onchange = async () => {
+  const file = camera.files?.[0];
+  if (!file) return;
+  camera.value = '';
+  shoot.textContent = 'bakıyor…';
+  shoot.disabled = true;
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000)
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    const question = prompt('Ne sormak istersin?', 'Bu ne?');
+    if (question === null) return;
+    await fetch('/look', { method: 'POST', body: JSON.stringify({
+      image: btoa(binary), question, mime: file.type || 'image/jpeg' }) });
+    empty.style.display = 'none';
+  } catch {
+    note.textContent = 'Fotoğraf gönderilemedi.';
+  } finally {
+    shoot.textContent = 'Bir şeye bak';
+    shoot.disabled = false;
+  }
+};
 
 start.onclick = async () => {
   if (running) return stop();

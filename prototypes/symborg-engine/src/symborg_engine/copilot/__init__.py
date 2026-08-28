@@ -5,6 +5,7 @@ from __future__ import annotations
 from .extract import extract
 from .judge import Judgement, decide, judge_moment
 from .contradiction import Mismatch, check
+from .look import Sighting, look
 from .memory import KINDS, Memory, Recollection
 from .session import Copilot, Heard
 from .translate import Rendering, Translator
@@ -20,5 +21,6 @@ __all__ = [
     "Copilot", "Heard", "Mismatch", "check", "decide",
     "Translator", "Rendering",
     "Channel", "Situation", "Delivery", "Held", "route",
+    "Sighting", "look",
     "MIN_GAP_S", "MAX_PER_MINUTE", "DEFAULT_THRESHOLD",
 ]

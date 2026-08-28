@@ -11,6 +11,7 @@ from the environment and is never logged, written to disk, or placed in a prompt
 from __future__ import annotations
 
 import json
+import base64
 import os
 
 from .base import Prompt, ProviderError
@@ -66,7 +67,7 @@ class OpenAILanguageModel:
         kwargs: dict = {
             "model": self._model,
             "instructions": prompt.system,
-            "input": prompt.user,
+            "input": _input_for(prompt),
             "max_output_tokens": max(_MIN_OUTPUT_TOKENS, int(prompt.max_tokens)),
             # Lowest-latency setting, and on current models the precondition for
             # temperature being accepted at all.
@@ -137,3 +138,22 @@ class OpenAILanguageModel:
             if index != -1:
                 text = text[:index]
         return text.strip()
+
+
+def _input_for(prompt: Prompt) -> object:
+    """The request body's input: a plain string, or a message carrying a picture.
+
+    Kept here rather than in Prompt because the shape is this provider's business; the
+    engine hands over bytes and a mime type and knows nothing about content parts.
+    """
+    if not prompt.image:
+        return prompt.user
+    encoded = base64.b64encode(prompt.image).decode("ascii")
+    return [{
+        "role": "user",
+        "content": [
+            {"type": "input_text", "text": prompt.user},
+            {"type": "input_image",
+             "image_url": f"data:{prompt.image_mime};base64,{encoded}"},
+        ],
+    }]

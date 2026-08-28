@@ -41,6 +41,14 @@ class Prompt:
     max_tokens: int = 512
     temperature: float = 0.4
     stop: tuple[str, ...] = field(default_factory=tuple)
+    image: bytes | None = None
+    """Optional image the question is about, as encoded bytes (PNG or JPEG).
+
+    Providers that cannot see ignore it and answer from the text alone, which is why
+    callers must write a question that still makes sense without the picture.
+    """
+    image_mime: str = "image/jpeg"
+
     json_schema: dict | None = None
     """Optional shape the reply should conform to.
 
