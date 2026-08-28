@@ -10,15 +10,18 @@ from __future__ import annotations
 import base64
 import http.client
 import json
+import shutil
+import tempfile
 import threading
 import time
 import unittest
+from pathlib import Path
 
 from symborg_engine.copilot import Copilot, Memory, Recollection, Situation
 from symborg_engine.providers.browser_audio import BrowserSource
 from symborg_engine.providers.offline import OfflineLanguageModel, OfflineSynthesiser
-from symborg_engine.ui.copilot_server import (BLOCK_LIMIT, PHOTO_LIMIT,
-                                              CopilotState, _handler)
+from symborg_engine.ui.copilot_server import (BLOCK_LIMIT, PHOTO_LIMIT, STATIC,
+                                              CopilotState, _certificate, _handler)
 from symborg_engine.ui.server import Broadcaster, QuietServer
 
 
@@ -306,3 +309,62 @@ class TestBeingAddressedThroughThePage(unittest.TestCase):
             for key in ("at", "transcript", "said", "channel", "held", "remembered",
                         "latency_ms", "audio", "addressed", "want", "sighting"):
                 self.assertIn(key, entry)
+
+
+class TestItMakesItsOwnCertificate(unittest.TestCase):
+    """A browser only hands over a microphone on localhost or HTTPS, so reaching this
+    from a phone needs a certificate. Asking someone to compose an openssl invocation
+    before they can try their own prototype is a good way for it never to be tried."""
+
+    @unittest.skipUnless(shutil.which("openssl"), "openssl is not installed")
+    def test_one_is_generated_on_first_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            made = _certificate(Path(tmp), "192.168.1.50")
+            self.assertIsNotNone(made)
+            cert, key = made
+            self.assertTrue(Path(cert).exists())
+            self.assertIn(b"BEGIN CERTIFICATE", Path(cert).read_bytes())
+
+    @unittest.skipUnless(shutil.which("openssl"), "openssl is not installed")
+    def test_it_is_reused_rather_than_remade(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = _certificate(Path(tmp), "192.168.1.50")
+            before = Path(first[0]).read_bytes()
+            _certificate(Path(tmp), "192.168.1.50")
+            self.assertEqual(Path(first[0]).read_bytes(), before)
+
+    @unittest.skipUnless(shutil.which("openssl"), "openssl is not installed")
+    def test_a_new_address_gets_a_new_certificate(self):
+        """A certificate for last week's wifi proves nothing about this one."""
+        with tempfile.TemporaryDirectory() as tmp:
+            first = _certificate(Path(tmp), "192.168.1.50")
+            before = Path(first[0]).read_bytes()
+            _certificate(Path(tmp), "10.0.0.7")
+            self.assertNotEqual(Path(first[0]).read_bytes(), before)
+
+    @unittest.skipUnless(shutil.which("openssl"), "openssl is not installed")
+    def test_the_private_key_is_not_world_readable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _, key = _certificate(Path(tmp), "192.168.1.50")
+            self.assertEqual(Path(key).stat().st_mode & 0o077, 0)
+
+
+class TestThePageCarriesItsOwnParts(unittest.TestCase):
+    """A worklet module cannot be inlined, and the gate is shared with the engine, so
+    the page is no longer one file. A missing part fails silently in a browser."""
+
+    PORT = 8762
+
+    def test_every_part_is_served(self):
+        with _Served(_copilot(), self.PORT) as served:
+            for path, ctype in (("/vad.js", "javascript"), ("/capture.js", "javascript"),
+                                ("/manifest.json", "manifest"), ("/icon.svg", "svg")):
+                with self.subTest(path=path):
+                    status, body = served.request("GET", path)
+                    self.assertEqual(status, 200)
+                    self.assertTrue(body)
+
+    def test_the_page_asks_for_what_is_served(self):
+        page = (STATIC / "copilot.html").read_text(encoding="utf-8")
+        for path in ("/vad.js", "/capture.js", "/manifest.json"):
+            self.assertIn(path, page)

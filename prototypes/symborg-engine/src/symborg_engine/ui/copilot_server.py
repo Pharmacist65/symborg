@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import argparse
 import base64
+import shutil
+import subprocess
 import binascii
 import json
 import queue
@@ -39,7 +41,18 @@ from .server import Broadcaster, QuietServer
 __all__ = ["CopilotState", "serve", "main"]
 
 STATIC = Path(__file__).parent / "static"
+
+STATIC_FILES = {
+    # The capture worklet has to be its own file — a worklet module cannot be inlined,
+    # and the gate is a module so the browser and the engine can share one description
+    # of what counts as speech.
+    "/vad.js": ("vad.js", "text/javascript; charset=utf-8"),
+    "/capture.js": ("capture.js", "text/javascript; charset=utf-8"),
+    "/manifest.json": ("manifest.json", "application/manifest+json; charset=utf-8"),
+    "/icon.svg": ("icon.svg", "image/svg+xml"),
+}
 DEFAULT_PORT = 8771
+DEFAULT_TLS_DIR = "~/.symborg/tls"
 BLOCK_LIMIT = 1 << 20      # a page sending more than a megabyte at once is not audio
 PHOTO_LIMIT = 1 << 23      # a photograph, base64-encoded, with room to spare
 HARD_LIMIT = 1 << 24       # past this, the connection is not worth saving
@@ -80,6 +93,41 @@ class CopilotState:
             },
             "log": self.log[-12:],
         }
+
+
+def _certificate(directory: Path, host: str) -> tuple[str, str] | None:
+    """Find or make a certificate for this machine's address.
+
+    A browser will not hand over a microphone on plain HTTP unless the address is
+    localhost, so reaching this from a phone needs TLS — and asking someone to compose
+    an openssl invocation before they can try their own prototype is a good way for the
+    prototype never to be tried. Generated once and reused; regenerated when the address
+    changes, because a certificate for the wifi you were on last week proves nothing
+    about the one you are on now.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    cert, key, stamp = (directory / "cert.pem", directory / "key.pem",
+                        directory / "cert.host")
+    if cert.exists() and key.exists() and stamp.exists():
+        if stamp.read_text(encoding="utf-8").strip() == host:
+            return str(cert), str(key)
+
+    openssl = shutil.which("openssl")
+    if openssl is None:
+        return None
+    result = subprocess.run(
+        [openssl, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "365",
+         "-keyout", str(key), "-out", str(cert), "-subj", f"/CN={host}",
+         "-addext", f"subjectAltName=IP:{host},DNS:localhost,IP:127.0.0.1"],
+        capture_output=True, text=True)
+    if result.returncode != 0 or not cert.exists():
+        return None
+    stamp.write_text(host, encoding="utf-8")
+    try:
+        key.chmod(0o600)
+    except OSError:
+        pass
+    return str(cert), str(key)
 
 
 def _lan_address() -> str:
@@ -162,8 +210,14 @@ def _handler(state: CopilotState, bus: Broadcaster, audio: dict):
             if self.path in ("/", "/index.html"):
                 self._send(200, (STATIC / "copilot.html").read_bytes(),
                            "text/html; charset=utf-8")
+            elif self.path in STATIC_FILES:
+                name, ctype = STATIC_FILES[self.path]
+                try:
+                    self._send(200, (STATIC / name).read_bytes(), ctype)
+                except OSError:
+                    self._send(404, b"", "text/plain")
             elif self.path == "/favicon.ico":
-                self._send(204, b"", "image/x-icon")
+                self._send(200, (STATIC / "icon.svg").read_bytes(), "image/svg+xml")
             elif self.path == "/events":
                 self._events()
             elif self.path.startswith("/audio/"):
@@ -350,14 +404,20 @@ def _listen(state: CopilotState, bus: Broadcaster, audio: dict, language: str) -
 
 def serve(copilot: Copilot, port: int = DEFAULT_PORT, language: str = "tr",
           certfile: str | None = None, keyfile: str | None = None,
-          bind: str = "0.0.0.0", mine: str = "Türkçe",
-          theirs: str = "İngilizce") -> None:
+          bind: str = "0.0.0.0", mine: str = "Türkçe", theirs: str = "İngilizce",
+          tls_dir: str = DEFAULT_TLS_DIR, plain: bool = False) -> None:
     """Run the page and the engine together until interrupted."""
     source = BrowserSource()
     state = CopilotState(copilot=copilot, source=source,
                          translator=Translator(copilot.model, mine=mine, theirs=theirs))
     bus = Broadcaster()
     audio: dict[str, bytes] = {}
+
+    host = _lan_address()
+    if not certfile and not keyfile and not plain:
+        made = _certificate(Path(tls_dir).expanduser(), host)
+        if made is not None:
+            certfile, keyfile = made
 
     server = QuietServer((bind, port), _handler(state, bus, audio))
     scheme = "http"
@@ -370,18 +430,16 @@ def serve(copilot: Copilot, port: int = DEFAULT_PORT, language: str = "tr",
     threading.Thread(target=_listen, args=(state, bus, audio, language),
                      daemon=True).start()
 
-    host = _lan_address()
     print(f"  {scheme}://127.0.0.1:{port}      (this machine)")
-    print(f"  {scheme}://{host}:{port}   (a phone on the same network)")
-    if scheme == "http":
-        print("\n  A browser will not hand over a microphone on a plain-HTTP page unless")
-        print("  the address is localhost, so the phone can watch but cannot listen.")
-        print("  For the phone's microphone, make a certificate and pass it:\n")
-        print(f"    openssl req -x509 -newkey rsa:2048 -nodes -days 365 \\")
-        print(f"      -keyout key.pem -out cert.pem -subj '/CN={host}' \\")
-        print(f"      -addext 'subjectAltName=IP:{host}'")
-        print(f"    ... --cert cert.pem --key key.pem\n")
-    print("  Ctrl-C to stop.\n")
+    print(f"  {scheme}://{host}:{port}   ← open this on the phone")
+    if scheme == "https":
+        print("\n  The certificate is self-signed, so the phone warns once:")
+        print("  Gelişmiş → Yine de devam et. Then Add to Home Screen for full screen.")
+    else:
+        print("\n  Running without TLS, so the phone can watch but cannot listen —")
+        print("  a browser only hands over a microphone on localhost or HTTPS.")
+        print("  Install openssl, or pass --cert and --key.")
+    print("\n  Ctrl-C to stop.\n")
 
     try:
         server.serve_forever()
@@ -403,6 +461,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--bind", default="0.0.0.0")
     parser.add_argument("--mine", default="Türkçe", help="The person's own language")
     parser.add_argument("--theirs", default="İngilizce", help="What to translate into")
+    parser.add_argument("--tls-dir", default=DEFAULT_TLS_DIR,
+                        help="Where to keep the generated certificate")
+    parser.add_argument("--plain", action="store_true",
+                        help="Serve over HTTP; the phone can then watch but not listen")
     args = parser.parse_args(argv)
 
     ensure_trust_store()
@@ -412,7 +474,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n  sample rate {SAMPLE_RATE} Hz   language {args.language}")
     serve(copilot, port=args.port, language=args.language,
           certfile=args.cert, keyfile=args.key, bind=args.bind,
-          mine=args.mine, theirs=args.theirs)
+          mine=args.mine, theirs=args.theirs, tls_dir=args.tls_dir, plain=args.plain)
     return 0
 
 

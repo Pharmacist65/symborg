@@ -39,64 +39,62 @@ the real providers on purpose, set `SYMBORG_TEST_LIVE=1`.
 
 ## The copilot, on a phone
 
-The routing work settled the hardware question. Run one afternoon of conversation
-through four situations and the third row is the product:
-
-| situation | channel |
-|---|---|
-| earpiece | ear — it lands |
-| meeting, phone on the table | screen — it lands, silently |
-| meeting, phone in a pocket | nothing at all |
-| alone at home | the loudspeaker tells nobody |
-
-In the situation this exists for — someone else talking, a wrong date being agreed — a
-pocketed phone has no way through. The earpiece is not an accessory to choose later; it
-is the channel. So phase A is the phone as microphone, ear and screen, with the engine
-running elsewhere:
-
 ```bash
 PYTHONPATH=src python3 -m symborg_engine.ui.copilot_server
 ```
 
-It prints two addresses. The second is reachable from a phone on the same network — but
-a browser will not hand over a microphone on a plain-HTTP page unless the address is
-localhost, so from a phone that page can watch and cannot listen. For the microphone,
-make a certificate for your own address and pass it:
+It prints two addresses. Open the second one on the phone, on the same wifi. A browser
+only hands over a microphone on localhost or HTTPS, so it makes its own certificate on
+first run and reuses it — the phone warns once that it is self-signed, which it is. Add
+to Home Screen and it runs full screen with no browser furniture.
 
-```bash
-openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
-  -keyout key.pem -out cert.pem -subj "/CN=$(ipconfig getifaddr en0)" \
-  -addext "subjectAltName=IP:$(ipconfig getifaddr en0)"
-```
+The phone is the microphone, the ear, the screen and the camera; the engine runs
+wherever you started it. That split is not a compromise, it is what the audio requires —
+a Bluetooth earpiece cannot be the room microphone, because every modern headset
+beamforms a null at the room to isolate the wearer's own mouth. The people talking near
+you are, by the headset's design, noise. So the earpiece plays and the phone listens,
+which also removes the echo path entirely: it can keep transcribing while it speaks.
 
-```bash
-PYTHONPATH=src python3 -m symborg_engine.ui.copilot_server --cert cert.pem --key key.pem
-```
+The routing follows from that. Run one afternoon through four situations:
 
-The phone will warn once that the certificate is self-signed, which it is. `*.pem` is
-gitignored: the pair you generate is yours alone.
+| situation | channel |
+|---|---|
+| earpiece | ear — it lands |
+| phone on the table, company | screen — it lands, silently |
+| phone in a pocket, company | nothing at all |
+| alone | the loudspeaker tells nobody |
 
-The page has a press-to-talk button. Hold it, say something, let go — the audio keeps
-flowing through the same stream, and the button only marks which turn was meant for the
-device rather than for the room. An earpiece button would do exactly the same thing,
-which is the point: the phone is standing in for hardware that does not exist yet.
+The third row is why the phone has to be worn where it can hear.
 
-Being addressed is the exact inverse of everything else here. The gate does not apply,
-the rate limit does not apply, and mute does not apply — mute is the person's instruction
-and so is talking to it, and the later one wins. What takes judgement is working out what
-they wanted, because the answers come from different places:
+### What the phone does before anything is sent
+
+Silence never leaves it. The same gate runs in the browser and in the engine — two
+descriptions of one decision, held together by a test that feeds both the same audio and
+fails if a single block differs. On a quiet room it passes under 40% and falling, and
+the tier it lands in matters more than the gate: the same audio costs about $340 a month
+on a live transcription tier and about $17 on a batch one.
+
+`bench/density.py` measures the fraction on your own day, with a real microphone and
+nothing leaving the machine. Every cost estimate scales off that one number and nobody
+has measured it.
+
+### Talking to it
+
+Hold the press-to-talk button, say something, let go. The audio keeps flowing through
+the one stream; the button only marks which turn was meant for the device rather than
+for the room — which is what an earpiece button will do when there is one.
 
 | said to it | goes to |
 |---|---|
 | "şu adamın adı neydi" | memory |
-| "baksana şuna, bu ne" | the camera — and it says *telefonu ona doğru tut* first |
+| "baksana şuna, bu ne" | the camera — it says *telefonu ona doğru tut* first |
 | "bunu İngilizce nasıl derim: hesabı alabilir miyiz" | the translator, carrying only the second half |
 | "kızımın doğum günü 12 Mart, bunu unutma" | memory, deliberately, outranking any score |
 | "her şeyi unut" | obeyed, never argued with |
 
-26/26 on `eval/addressed.py`. When it asks to be pointed at something the page opens the
-camera itself, rather than making the person find a button while still holding the thing
-up.
+26/26 on `eval/addressed.py`. Being addressed suspends the gate, the rate limit and mute
+— mute is the person's instruction and so is talking to it, and the later one wins — but
+not the routing: a loudspeaker in a room full of people still tells everyone.
 
 The page also has a camera. Point it at something and ask, and it answers what it can
 see rather than the question you asked:
@@ -112,14 +110,8 @@ cent is a coin flip taken with your life a few times a year. So the words that g
 permission — yenir, güvenli, zararsız, edible — are refused in the prompt *and* replaced
 in code if the model says them anyway: a prompt is a request, and this needs to be a
 promise. Asking as a mycologist, asking in a hurry, and asking for "just a yes" all get
-the same answer.
-
-Nothing about this is medical. It is the limit of what a photograph can settle, and it
-applies the same to a mushroom, a snake, a plug socket and a road sign.
-
-The page has three switches — earpiece, someone with me, screen visible — because the
-routing depends on them and only the person knows. They are why the same sentence goes
-to the ear in one room and nowhere in another.
+the same answer. Nothing about this is medical; it is the limit of what a photograph can
+settle, and it applies the same to a mushroom, a snake, a plug socket and a road sign.
 
 ## The authorship invariant
 
