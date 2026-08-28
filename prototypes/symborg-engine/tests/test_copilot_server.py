@@ -18,6 +18,7 @@ import unittest
 from pathlib import Path
 
 from symborg_engine.copilot import Copilot, Memory, Recollection, Situation
+from symborg_engine.copilot.rig import EARPIECE, PHONE, Rig
 from symborg_engine.providers.browser_audio import BrowserSource
 from symborg_engine.providers.offline import OfflineLanguageModel, OfflineSynthesiser
 from symborg_engine.ui.copilot_server import (ADDRESS_WINDOW_S, BLOCK_LIMIT,
@@ -71,7 +72,10 @@ class _Served:
     """A running server, for tests that need real requests."""
 
     def __init__(self, copilot: Copilot, port: int) -> None:
-        self.state = CopilotState(copilot=copilot, source=BrowserSource())
+        rig = Rig()
+        rig.attach(PHONE)        # what serve() attaches; a test on an empty rig is a
+        rig.attach(EARPIECE)     # test of a device with no hardware in it
+        self.state = CopilotState(copilot=copilot, source=BrowserSource(), rig=rig)
         self.bus = Broadcaster()
         self.audio: dict[str, bytes] = {}
         self.server = QuietServer(("127.0.0.1", port), _handler(self.state, self.bus,
@@ -173,6 +177,28 @@ class TestTheServer(unittest.TestCase):
             served.request("POST", "/situation",
                            body=json.dumps({"earpiece": False}).encode())
             self.assertTrue(copilot.situation.screen_visible)
+            self.assertFalse(copilot.situation.earpiece)
+
+    def test_unplugging_the_earpiece_moves_where_things_go(self):
+        """The rig is not a label. Detaching a private channel changes where the next
+        sentence lands."""
+        copilot = _copilot()
+        with _Served(copilot, self.PORT + 9) as served:
+            served.request("POST", "/situation",
+                           body=json.dumps({"earpiece": True}).encode())
+            self.assertTrue(copilot.situation.earpiece)
+            served.request("POST", "/situation",
+                           body=json.dumps({"earpiece": False}).encode())
+            self.assertFalse(copilot.situation.earpiece)
+            self.assertIsNone(served.state.rig.ear)
+
+    def test_a_screen_it_does_not_have_cannot_be_visible(self):
+        copilot = _copilot()
+        with _Served(copilot, self.PORT + 10) as served:
+            served.state.rig.detach(PHONE.name)
+            served.request("POST", "/situation",
+                           body=json.dumps({"screen_visible": True}).encode())
+            self.assertFalse(copilot.situation.screen_visible)
 
     def test_a_malformed_situation_is_rejected(self):
         with _Served(_copilot(), self.PORT + 5) as served:

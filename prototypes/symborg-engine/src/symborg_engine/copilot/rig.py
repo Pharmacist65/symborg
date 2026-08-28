@@ -87,6 +87,11 @@ PHONE = Peripheral(
     private=False,          # a phone speaker tells the room
     far_field=True,         # its microphone is the one that hears other people
 )
+"""Playing to a Bluetooth earpiece while the phone's own microphone keeps listening is
+not a trick — it is what Android does by default, because A2DP has no capture path at
+all. One call destroys it: `setCommunicationDevice` or `MODE_IN_COMMUNICATION` switches
+to HFP/SCO, suspends A2DP, drops output to mono 8-16 kHz and moves the microphone to the
+headset. Stay in MODE_NORMAL and the design this engine assumes is the default one."""
 
 EARPIECE = Peripheral(
     "earpiece",

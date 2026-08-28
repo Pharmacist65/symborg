@@ -32,6 +32,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 from ..copilot import Copilot, Memory, Situation
+from ..copilot.rig import EARPIECE, PHONE, Rig
 from ..copilot.look import look
 from ..copilot.translate import Translator
 from ..providers import resolve_language_model
@@ -72,6 +73,11 @@ class CopilotState:
 
     copilot: Copilot
     source: BrowserSource
+    rig: Rig = field(default_factory=Rig)
+    """What is attached. The routing reads the situation this produces, so unplugging the
+    earpiece on the page changes where the next sentence goes rather than only a label."""
+    alone: bool = False
+    screen_visible: bool = True
     translator: Translator | None = None
     heard: str = ""
     listening: bool = False
@@ -109,6 +115,7 @@ class CopilotState:
                 "others_present": self.copilot.situation.others_present,
                 "screen_visible": self.copilot.situation.screen_visible,
             },
+            "rig": self.rig.to_dict(),
             "log": self.log[-12:],
         }
 
@@ -274,15 +281,17 @@ def _handler(state: CopilotState, bus: Broadcaster, audio: dict):
                 except json.JSONDecodeError:
                     self._json({"error": "bad_request"}, 400)
                     return
-                current = state.copilot.situation
-                state.copilot.situation = Situation(
-                    earpiece=bool(payload.get("earpiece", current.earpiece)),
-                    screen_visible=bool(payload.get("screen_visible",
-                                                    current.screen_visible)),
-                    others_present=bool(payload.get("others_present",
-                                                    current.others_present)),
-                    noisy=current.noisy,
-                )
+                if "earpiece" in payload:
+                    if payload["earpiece"]:
+                        state.rig.attach(EARPIECE)
+                    else:
+                        state.rig.detach(EARPIECE.name)
+                if "screen_visible" in payload:
+                    state.screen_visible = bool(payload["screen_visible"])
+                if "others_present" in payload:
+                    state.alone = not bool(payload["others_present"])
+                state.copilot.situation = state.rig.situation(
+                    alone=state.alone, screen_visible=state.screen_visible)
                 bus.publish(state.snapshot())
                 self._json({"ok": True})
             elif self.path == "/address":
@@ -426,8 +435,12 @@ def serve(copilot: Copilot, port: int = DEFAULT_PORT, language: str = "tr",
           tls_dir: str = DEFAULT_TLS_DIR, plain: bool = False) -> None:
     """Run the page and the engine together until interrupted."""
     source = BrowserSource()
-    state = CopilotState(copilot=copilot, source=source,
+    rig = Rig()
+    rig.attach(PHONE)        # it is the room microphone, the camera and the screen
+    rig.attach(EARPIECE)
+    state = CopilotState(copilot=copilot, source=source, rig=rig,
                          translator=Translator(copilot.model, mine=mine, theirs=theirs))
+    copilot.situation = rig.situation(alone=False, screen_visible=True)
     bus = Broadcaster()
     audio: dict[str, bytes] = {}
 
